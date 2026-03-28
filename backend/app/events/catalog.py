@@ -17,4 +17,9 @@ class EventType:
     USER_LOGGED_IN = "user.logged_in"
     USER_LOGGED_OUT = "user.logged_out"
 
+    # ─── Contacts & Leads (Phase 1B) ─────────────────────────────────────────────
+    CONTACT_CREATED = "contact.created"
+    LEAD_CREATED = "lead.created"
+    LEAD_STAGE_CHANGED = "lead.stage_changed"
+
     # Additional event types are appended here as new phases are implemented.

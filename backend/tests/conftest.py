@@ -16,6 +16,8 @@ from app.core.security import create_access_token, create_refresh_token, hash_pa
 from app.db.session import get_session
 from app.main import app as _app
 from app.models.base import Base
+from app.models.contact import Contact  # noqa: F401 — registers table with Base.metadata
+from app.models.lead import Lead  # noqa: F401 — registers table with Base.metadata
 from app.models.organization import Organization
 from app.models.user import User, UserRole
 
@@ -47,7 +49,7 @@ async def create_tables() -> AsyncGenerator[None, None]:
     async with _TEST_ENGINE.begin() as conn:
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "pgcrypto"'))
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-        # Create the user_role enum if it doesn't exist (mirrors the migration)
+        # Create enum types if they don't exist (mirrors migrations)
         await conn.execute(text("""
             DO $$
             BEGIN
@@ -56,11 +58,38 @@ async def create_tables() -> AsyncGenerator[None, None]:
                 END IF;
             END $$;
         """))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'contact_status') THEN
+                    CREATE TYPE contact_status AS ENUM ('active', 'inactive', 'do_not_contact');
+                END IF;
+            END $$;
+        """))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lead_status') THEN
+                    CREATE TYPE lead_status AS ENUM ('new', 'contacted', 'qualified', 'converted', 'discarded');
+                END IF;
+            END $$;
+        """))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lead_source') THEN
+                    CREATE TYPE lead_source AS ENUM ('csv_import', 'manual', 'api', 'voicehire');
+                END IF;
+            END $$;
+        """))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with _TEST_ENGINE.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.execute(text("DROP TYPE IF EXISTS user_role"))
+        await conn.execute(text("DROP TYPE IF EXISTS contact_status"))
+        await conn.execute(text("DROP TYPE IF EXISTS lead_status"))
+        await conn.execute(text("DROP TYPE IF EXISTS lead_source"))
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -69,7 +98,7 @@ async def clean_tables() -> AsyncGenerator[None, None]:
     yield
     async with _TEST_ENGINE.begin() as conn:
         # Truncate in dependency order (events first, then users, then orgs).
-        await conn.execute(text("TRUNCATE TABLE events, users, organizations RESTART IDENTITY CASCADE"))
+        await conn.execute(text("TRUNCATE TABLE events, contacts, leads, users, organizations RESTART IDENTITY CASCADE"))
 
 
 # ─── Session fixture ──────────────────────────────────────────────────────────
