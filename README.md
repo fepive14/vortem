@@ -85,5 +85,35 @@ docker compose logs -f backend worker
 |---|---|---|
 | `backend` | 8000 | FastAPI application (hot-reload in dev) |
 | `worker` | — | Event bus consumer |
-| `db` | 5432 | PostgreSQL 16 |
-| `redis` | 6379 | Redis 7 (sessions, cache) |
+| `db` | 5433 | PostgreSQL 16 (host port) |
+| `redis` | 6380 | Redis 7 (host port) |
+
+---
+
+## Session Closing Checklist
+
+> **Mandatory steps at the end of every development session.**
+
+```
+[ ] 1. Run tests — all must pass before closing
+        docker compose exec backend pytest -v
+
+[ ] 2. Update SESSIONS.md — add or update the summary for this session
+        (bugs found, decisions made, files changed, final test count)
+
+[ ] 3. Commit everything — use Conventional Commits format
+        feat:     new feature
+        fix:      bug fix
+        docs:     documentation only
+        refactor: no behaviour change
+        test:     adding or fixing tests
+        chore:    tooling, deps, config
+
+        git add <files>
+        git commit -m "type: short description"
+
+[ ] 4. Push to origin main
+        git push
+```
+
+No session is complete until all four steps are done.

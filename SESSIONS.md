@@ -2,6 +2,36 @@
 
 ---
 
+## Session Closing Checklist
+
+> **Mandatory steps at the end of every development session.**
+
+```
+[ ] 1. Run tests — all must pass before closing
+        docker compose exec backend pytest -v
+
+[ ] 2. Update SESSIONS.md — add or update the summary for this session
+        (bugs found, decisions made, files changed, final test count)
+
+[ ] 3. Commit everything — use Conventional Commits format
+        feat:     new feature
+        fix:      bug fix
+        docs:     documentation only
+        refactor: no behaviour change
+        test:     adding or fixing tests
+        chore:    tooling, deps, config
+
+        git add <files>
+        git commit -m "type: short description"
+
+[ ] 4. Push to origin main
+        git push
+```
+
+No session is complete until all four steps are done.
+
+---
+
 ## Session 1 — Phase 1A: Backend Foundation
 
 **Date:** 2026-03-28
