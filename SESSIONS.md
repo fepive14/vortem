@@ -411,3 +411,105 @@ Git: `f261e79` — pushed to origin/main.
 - `GET /api/v1/notifications/unread-count` — for polling (every 30s from frontend)
 - Event handlers in worker.py that generate Notification records for: lead.converted, deal.stage_changed, task due
 - Tests: 8 tests → target 65/65
+
+---
+
+## Session 4 — Phase 1D: Supervisor, Webhooks, Notifications
+
+**Date:** 2026-03-28
+**Phase:** 1D
+**Status:** Complete — 76/76 tests passing
+
+---
+
+### What was built
+
+#### Models
+| File | Description |
+|---|---|
+| `backend/app/models/notification.py` | Notification entity. Fields: user_id (FK → users), type (str), priority (SAEnum: normal/high), title, body, entity_type (str, nullable), entity_id (UUID, nullable), read_at (nullable). Polymorphic reference to any entity. |
+
+#### Migration
+| File | Description |
+|---|---|
+| `backend/alembic/versions/0004_notifications_webhook.py` | Creates enum notification_priority with DO $$ guard. Creates table notifications. Indexes on user_id, (user_id, read_at), organization_id. Also patches: ALTER TABLE events ADD COLUMN IF NOT EXISTS updated_at (backfill for existing installs where 0001 omitted it). ALTER TABLE organizations DROP CONSTRAINT IF EXISTS fk_organizations_pipeline_id before drop_all teardown. |
+
+#### Schemas
+| File | Description |
+|---|---|
+| `backend/app/schemas/notification.py` | NotificationRead (from_attributes=True). |
+| `backend/app/schemas/webhook.py` | VoiceHireWebhookPayload: lead_id, event, status (nullable), voicehire_data (dict), campaign_id (nullable). |
+| `backend/app/schemas/lead.py` | Added LeadAssignRequest (assigned_to: UUID). |
+
+#### Services
+| File | Description |
+|---|---|
+| `backend/app/services/notification_service.py` | create_notification, list_notifications (by user+org, DESC), get_unread_count (COUNT WHERE read_at IS NULL), mark_as_read. |
+| `backend/app/services/supervisor_service.py` | list_qualified_unassigned (status=qualified AND assigned_to IS NULL, ORDER BY created_at ASC — FIFO queue), assign_lead. |
+| `backend/app/services/webhook_service.py` | process_voicehire_event: fetch lead → merge voicehire_data (update, not replace) → update status if provided → set campaign_id if missing → create Activity(type=voicehire_call) → flush. Endpoint commits and publishes events. |
+
+#### Events
+| File | Description |
+|---|---|
+| `backend/app/events/catalog.py` | Added: LEAD_ASSIGNED, LEAD_QUALIFIED, VOICEHIRE_CALL_COMPLETED, NOTIFICATION_CREATED. |
+| `backend/app/events/worker.py` | Added 3 handlers: LEAD_QUALIFIED → notify all supervisors in org (priority=high). LEAD_ASSIGNED → notify assigned agent (priority=high). DEAL_STAGE_CHANGED → notify deal.assigned_to (priority=normal). Each handler uses its own session and catches exceptions without crashing the worker loop. |
+
+#### API
+| File | Description |
+|---|---|
+| `backend/app/api/v1/notifications.py` | GET /notifications (paginated, current user), GET /notifications/unread-count → {count: int}, PATCH /notifications/{id}/read → 200 with updated notification. 404 if wrong user. |
+| `backend/app/api/v1/supervisor.py` | GET /supervisor/leads/queue (admin+supervisor only, skip/limit), PATCH /supervisor/leads/{id}/assign (admin+supervisor only) → publishes LEAD_ASSIGNED after commit. |
+| `backend/app/api/v1/webhooks.py` | POST /webhooks/voicehire/{organization_id} — no auth, validated by X-VoiceHire-Secret header against settings.VOICEHIRE_WEBHOOK_SECRET. 401 if missing or wrong. |
+| `backend/app/core/config.py` | Added VOICEHIRE_WEBHOOK_SECRET field (default: 'change-me-in-production'). |
+| `backend/app/api/v1/router.py` | Added notifications, supervisor, webhooks routers. |
+
+#### Tests
+| File | Description |
+|---|---|
+| `backend/tests/test_notifications.py` | 7 tests: create+list, unread count, mark as read, wrong user (404), paginated, isolated by user, unread count excludes read. |
+| `backend/tests/test_supervisor.py` | 6 tests: empty queue, shows qualified unassigned, excludes assigned, excludes non-qualified, assign success, agent forbidden (403). |
+| `backend/tests/test_webhooks.py` | 6 tests: updates status, merges voicehire_data, creates activity, wrong secret (401), lead not found (404), qualified event triggers supervisor notification. |
+
+---
+
+### Architecture decisions
+
+**Webhook authentication via shared secret**
+VoiceHire webhooks bypass JWT auth — they come from an external system. Authentication uses a shared secret in the `X-VoiceHire-Secret` header validated against `settings.VOICEHIRE_WEBHOOK_SECRET`. The endpoint is scoped by `organization_id` in the URL so each org can receive its own events.
+
+**voicehire_data merge strategy**
+When a webhook arrives with new voicehire_data, it is merged (dict.update) into the existing field rather than replaced. This preserves data from previous calls and accumulates signal across multiple interactions.
+
+**FIFO supervisor queue**
+`list_qualified_unassigned` orders by `created_at ASC`. Oldest qualified leads appear first — supervisors work the queue in order of arrival, not recency.
+
+**Event handlers are self-contained**
+Each worker event handler opens its own AsyncSession and commits independently. Exceptions are caught and logged without crashing the worker loop — a failed notification does not block other handlers.
+
+---
+
+### Bugs found and resolved
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| `column events.updated_at does not exist` | Migration 0001 created the events table without updated_at; the ORM inherits it from Base. On a fresh install alembic applies all migrations in order so the schema matches, but an existing DB (created before 0001 was fixed) was missing the column. | Added updated_at to migration 0001 definition for fresh installs. Added `ALTER TABLE events ADD COLUMN IF NOT EXISTS updated_at` to migration 0004 for existing installs. Applied manually to the current dev DB. |
+| `drop_all fails at teardown: cannot drop table pipelines` | `fk_organizations_pipeline_id` is a migration-only FK constraint not reflected in the ORM metadata. `Base.metadata.drop_all` doesn't know about it and can't order the drops correctly. | Added `ALTER TABLE organizations DROP CONSTRAINT IF EXISTS fk_organizations_pipeline_id` in the conftest teardown before `drop_all`. |
+| `BoundLogger.info() got multiple values for argument 'event'` | `event=` is structlog's reserved positional argument (the log message key). Passing `event=payload.event` as a keyword arg in webhook_service.py conflicts with it. | Renamed the kwarg to `voicehire_event=payload.event` in the structlog call. |
+
+---
+
+### Final state
+```
+76 passed in 167.61s (0:02:47)
+```
+
+Git: `9d8cee3` — pushed to origin/main.
+
+---
+
+### What comes next — Phase 1E
+
+- User management endpoints (admin can CRUD users in their org)
+- Reports: conversion funnel, agent performance, activity by campaign
+- Update architecture doc to reflect actual phases built vs original plan
+- Backend complete → ready for frontend (Next.js)
