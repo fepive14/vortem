@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vortem-backend"
+version = "0.1.0"
+description = "Vortem CRM — Backend API"
+requires-python = ">=3.12"
+
+dependencies = [
+    # Web framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+
+    # Database — async
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+
+    # Redis
+    "redis[hiredis]>=5.2.0",
+
+    # Configuration & validation
+    "pydantic[email]>=2.10.0",
+    "pydantic-settings>=2.7.0",
+
+    # Auth
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt==4.0.1",
+    "python-jose[cryptography]>=3.3.0",
+
+    # Structured logging
+    "structlog>=24.4.0",
+
+    # HTTP utilities
+    "python-multipart>=0.0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",
+    "asgi-lifespan>=2.1.0",
+    # psycopg2 for alembic autogenerate in sync context
+    "psycopg2-binary>=2.9.10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# ─── pytest ───────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Suppress deprecation noise from third-party libs
+filterwarnings = [
+    "ignore::DeprecationWarning:passlib",
+]
+
+# ─── coverage ─────────────────────────────────────────────────────────────────
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*", "alembic/*"]
