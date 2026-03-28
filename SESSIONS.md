@@ -178,3 +178,132 @@ Phase 1B will build the first business module on top of this foundation:
 - **Tests** — happy path + permission boundary tests (agent cannot delete, viewer cannot write)
 
 All endpoints will follow the same thin-router / service-layer pattern established in Phase 1A.
+
+---
+
+## Session 2 — Phase 1B: Contacts, Leads, CRUD
+
+**Date:** 2026-03-28
+**Phase:** 1B
+**Status:** Complete — 35/35 tests passing
+
+---
+
+### What was built
+
+#### Models
+| File | Description |
+|---|---|
+| `backend/app/models/contact.py` | Contact entity. Fields: first_name, last_name, phone, email, company, position, country, status (SAEnum: active/inactive/do_not_contact), lead_id (nullable FK), assigned_to (nullable FK), tags (JSONB), custom_fields (JSONB). `lazy="raise"` on all relationships. |
+| `backend/app/models/lead.py` | Lead entity. Fields: first_name, last_name, phone, email, country, status (SAEnum: new/contacted/qualified/converted/discarded), source (SAEnum: csv_import/manual/api/voicehire), campaign_id (nullable UUID), assigned_to (nullable FK), voicehire_data (JSONB). `lazy="raise"` on all relationships. |
+
+#### Migration
+| File | Description |
+|---|---|
+| `backend/alembic/versions/0002_contacts_leads.py` | Idempotent. Creates enums contact_status, lead_status, lead_source with DO $$ ... $$ guards. Creates tables leads and contacts (in that order — contacts FK references leads). Indexes on organization_id, assigned_to, and leads.status. |
+
+#### Schemas
+| File | Description |
+|---|---|
+| `backend/app/schemas/contact.py` | ContactCreate, ContactUpdate, ContactRead (from_attributes=True). |
+| `backend/app/schemas/lead.py` | LeadCreate, LeadUpdate, LeadRead (from_attributes=True). |
+
+#### Services
+| File | Description |
+|---|---|
+| `backend/app/services/contact_service.py` | create_contact (publishes CONTACT_CREATED), list_contacts (scoped by org, ordered by created_at DESC), get_contact, update_contact, delete_contact. |
+| `backend/app/services/lead_service.py` | Same shape as contact_service. create_lead publishes LEAD_CREATED. |
+
+#### Events
+| File | Description |
+|---|---|
+| `backend/app/events/catalog.py` | Added: CONTACT_CREATED, LEAD_CREATED, LEAD_STAGE_CHANGED. |
+
+#### API
+| File | Description |
+|---|---|
+| `backend/app/api/v1/contacts.py` | POST/GET/GET/{id}/PATCH/{id}/DELETE/{id}. Agents cannot delete (403). Viewers cannot write (403). All endpoints scoped by organization_id. |
+| `backend/app/api/v1/leads.py` | Same permission structure as contacts. |
+| `backend/app/api/v1/router.py` | Updated to include contacts and leads routers. |
+
+#### Tests
+| File | Description |
+|---|---|
+| `backend/tests/test_contacts.py` | 10 tests: create, list empty, list returns created, get success, get not found, update as agent, update as viewer (403), delete as supervisor, delete as agent (403), isolation by org. |
+| `backend/tests/test_leads.py` | 10 tests: same coverage pattern as test_contacts.py. |
+
+---
+
+### Architecture decisions
+
+**Permission model for CRUD**
+- All authenticated roles can read (GET) contacts and leads.
+- Agents can create and update but cannot delete.
+- Only admin and supervisor can delete.
+- Viewers cannot write (create, update, or delete).
+- This is enforced at the router level via `require_roles()` from `middleware/auth.py`.
+
+**Org isolation at the service layer**
+Every read in list/get filters by `organization_id`. A contact that exists in org A is not visible from org B even if you have a valid token for org B.
+
+---
+
+### Bugs found and resolved
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| `MissingGreenlet` on PATCH response | After `session.flush()` with `onupdate=func.now()` on `updated_at`, SQLAlchemy marks the column as expired. Pydantic's synchronous attribute access then hits a `MissingGreenlet` error when trying to serialize the response. | Added `await session.refresh(updated)` after `session.commit()` in both PATCH endpoints (contacts and leads), before serializing the response. |
+
+---
+
+### Final state
+```
+backend/tests/test_setup.py::test_setup_happy_path              PASSED
+backend/tests/test_setup.py::test_setup_already_initialized     PASSED
+backend/tests/test_setup.py::test_setup_weak_password           PASSED
+backend/tests/test_setup.py::test_setup_invalid_email           PASSED
+backend/tests/test_auth.py::test_login_success                  PASSED
+backend/tests/test_auth.py::test_login_wrong_password           PASSED
+backend/tests/test_auth.py::test_login_nonexistent_email        PASSED
+backend/tests/test_auth.py::test_login_inactive_user            PASSED
+backend/tests/test_auth.py::test_logout_clears_cookies          PASSED
+backend/tests/test_auth.py::test_refresh_success                PASSED
+backend/tests/test_auth.py::test_refresh_no_cookie              PASSED
+backend/tests/test_auth.py::test_refresh_invalid_token          PASSED
+backend/tests/test_auth.py::test_me_authenticated               PASSED
+backend/tests/test_auth.py::test_me_unauthenticated             PASSED
+backend/tests/test_auth.py::test_me_invalid_token               PASSED
+backend/tests/test_contacts.py::test_create_contact_success         PASSED
+backend/tests/test_contacts.py::test_list_contacts_empty            PASSED
+backend/tests/test_contacts.py::test_list_contacts_returns_created  PASSED
+backend/tests/test_contacts.py::test_get_contact_success            PASSED
+backend/tests/test_contacts.py::test_get_contact_not_found          PASSED
+backend/tests/test_contacts.py::test_update_contact_as_agent        PASSED
+backend/tests/test_contacts.py::test_update_contact_as_viewer_forbidden PASSED
+backend/tests/test_contacts.py::test_delete_contact_as_supervisor   PASSED
+backend/tests/test_contacts.py::test_delete_contact_as_agent_forbidden PASSED
+backend/tests/test_contacts.py::test_contact_isolated_by_org        PASSED
+backend/tests/test_leads.py::test_create_lead_success               PASSED
+backend/tests/test_leads.py::test_list_leads_empty                  PASSED
+backend/tests/test_leads.py::test_list_leads_returns_created        PASSED
+backend/tests/test_leads.py::test_get_lead_success                  PASSED
+backend/tests/test_leads.py::test_get_lead_not_found                PASSED
+backend/tests/test_leads.py::test_update_lead_as_agent              PASSED
+backend/tests/test_leads.py::test_update_lead_as_viewer_forbidden   PASSED
+backend/tests/test_leads.py::test_delete_lead_as_supervisor         PASSED
+backend/tests/test_leads.py::test_delete_lead_as_agent_forbidden    PASSED
+backend/tests/test_leads.py::test_lead_isolated_by_org              PASSED
+
+35 passed in N.NNs
+```
+
+Git: `f4144c1` — pushed to origin/main.
+
+---
+
+### What comes next — Phase 1C
+
+- Pipeline, Stage, Deal models
+- Lead → Contact conversion flow (`POST /leads/{id}/convert`)
+- Activity model (used by conversion to persist voicehire_data)
+- Tests: pipelines (8), deals (8), conversion (6) → target 57/57
