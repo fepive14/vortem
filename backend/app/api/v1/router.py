@@ -11,9 +11,11 @@ from app.api.v1 import (
     leads,
     notifications,
     pipelines,
+    reports,
     setup,
     stages,
     supervisor,
+    users,
     webhooks,
 )
 
@@ -29,3 +31,5 @@ router.include_router(deals.router, prefix="/deals", tags=["Deals"])
 router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 router.include_router(supervisor.router, prefix="/supervisor", tags=["Supervisor"])
 router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
+router.include_router(users.router, prefix="/users", tags=["Users"])
+router.include_router(reports.router, prefix="/reports", tags=["Reports"])
