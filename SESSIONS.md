@@ -307,3 +307,107 @@ Git: `f4144c1` — pushed to origin/main.
 - Lead → Contact conversion flow (`POST /leads/{id}/convert`)
 - Activity model (used by conversion to persist voicehire_data)
 - Tests: pipelines (8), deals (8), conversion (6) → target 57/57
+
+---
+
+## Session 3 — Phase 1C: Pipeline, Deals, Conversion
+
+**Date:** 2026-03-28
+**Phase:** 1C
+**Status:** Complete — 57/57 tests passing
+
+---
+
+### What was built
+
+#### Models
+| File | Description |
+|---|---|
+| `backend/app/models/pipeline.py` | Pipeline entity. organization_id nullable (null = instance-level default). Fields: name, description, is_default. `lazy="raise"` on all relationships. |
+| `backend/app/models/stage.py` | Stage entity. Fields: name, order, color, probability (0–100), is_won, is_lost, pipeline_id (FK). `lazy="raise"` on all relationships. |
+| `backend/app/models/deal.py` | Deal entity. Fields: name, value (Numeric 14,2), currency, contact_id, stage_id, pipeline_id, assigned_to, expected_close_date, closed_at, notes, custom_fields (JSONB). `lazy="raise"` on all relationships. |
+| `backend/app/models/activity.py` | Activity entity. Polymorphic — covers call, note, task, email, meeting, voicehire_call. Fields: type (SAEnum), contact_id, lead_id, deal_id, assigned_to, due_at, completed_at, body, metadata (JSONB). `lazy="raise"` on all relationships. |
+| `backend/app/models/organization.py` | Added pipeline_id (nullable FK → pipelines.id) — null = inherit instance default. |
+
+#### Migration
+| File | Description |
+|---|---|
+| `backend/alembic/versions/0003_pipeline_stages_deals.py` | Idempotent. Creates enum activity_type with DO $$ guard. Creates tables: pipelines, stages, deals, activities. ALTER TABLE organizations ADD COLUMN IF NOT EXISTS pipeline_id. Indexes: stages(pipeline_id), UNIQUE stages(pipeline_id, order), deals(organization_id/contact_id/stage_id/pipeline_id), activities(contact_id/lead_id). |
+
+#### Schemas
+| File | Description |
+|---|---|
+| `backend/app/schemas/pipeline.py` | PipelineCreate, PipelineUpdate, PipelineRead (from_attributes=True). |
+| `backend/app/schemas/stage.py` | StageCreate, StageUpdate, StageRead (from_attributes=True). |
+| `backend/app/schemas/deal.py` | DealCreate, DealUpdate, DealRead (from_attributes=True). |
+| `backend/app/schemas/conversion.py` | ConvertLeadRequest (assigned_to, create_deal, deal_name, stage_id, pipeline_id, value, currency). ConvertLeadResponse (contact: ContactRead, deal: DealRead | None). |
+
+#### Services
+| File | Description |
+|---|---|
+| `backend/app/services/pipeline_service.py` | create_pipeline (publishes PIPELINE_CREATED), list_pipelines, get_pipeline, update_pipeline, delete_pipeline. |
+| `backend/app/services/stage_service.py` | create_stage (validates pipeline belongs to org), list_stages (ORDER BY order ASC), get_stage, update_stage, delete_stage. |
+| `backend/app/services/deal_service.py` | create_deal (publishes DEAL_CREATED), list_deals, get_deal, update_deal (publishes DEAL_STAGE_CHANGED if stage_id changes), delete_deal. |
+| `backend/app/services/conversion_service.py` | convert_lead: fetches lead → 404 if missing, 400 if already converted → creates Contact → creates Activity if voicehire_data non-empty → sets lead.status='converted' → optionally creates Deal → flush. Endpoint commits and publishes LEAD_CONVERTED. |
+
+#### Events
+| File | Description |
+|---|---|
+| `backend/app/events/catalog.py` | Added: PIPELINE_CREATED, DEAL_CREATED, DEAL_STAGE_CHANGED, LEAD_CONVERTED. |
+
+#### API
+| File | Description |
+|---|---|
+| `backend/app/api/v1/pipelines.py` | POST/GET/GET/{id}/PATCH/{id}/DELETE/{id}. Create/update: admin+supervisor. Delete: admin only. |
+| `backend/app/api/v1/stages.py` | Same pattern. GET list takes ?pipeline_id= query param. Delete: admin only. |
+| `backend/app/api/v1/deals.py` | All roles can create/read. Agents can update. Delete: admin+supervisor only. |
+| `backend/app/api/v1/leads.py` | Added POST /{lead_id}/convert — require_roles(admin, supervisor). Returns ConvertLeadResponse. |
+| `backend/app/api/v1/router.py` | Added pipelines, stages, deals routers. |
+
+#### Tests
+| File | Description |
+|---|---|
+| `backend/tests/test_pipelines.py` | 8 tests: create as supervisor (201), create as agent (403), list, get not found (404), update, delete as admin (204), delete as supervisor (403), isolation by org. |
+| `backend/tests/test_deals.py` | 8 tests: create (201), list empty, get success, get not found (404), update stage, delete as agent (403), delete as supervisor (204), isolation by org. |
+| `backend/tests/test_conversion.py` | 6 tests: creates contact, sets lead status, idempotency (400), not found (404), with deal, voicehire_data creates Activity. |
+
+---
+
+### Architecture decisions
+
+**Pipeline scoping**
+`pipeline_id` on Organization is nullable. Null = organization inherits the instance-level default pipeline (where `pipeline.organization_id IS NULL`). Each org can optionally override with its own pipeline.
+
+**Activity as audit trail for conversion**
+When a Lead with non-empty `voicehire_data` is converted, the data is persisted as an `Activity(type='voicehire_call')`. This keeps the full call history attached to the Lead and Contact without polluting the Contact model with AI-specific fields.
+
+**Explicit UUID generation in conversion**
+SQLAlchemy's `default=uuid.uuid4` is invoked at flush time, not at object construction. When a Deal needs `contact.id` before flush, the fix is to generate the UUID explicitly (`contact_id = uuid.uuid4()`) and pass it to both objects rather than relying on the ORM default.
+
+---
+
+### Bugs found and resolved
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| `contact.id` is `None` when constructing Deal | SQLAlchemy's `default=uuid.uuid4` runs at `flush()`, not at `session.add()` or object construction. Deal was reading `contact.id` before the first flush. | Generate `contact_id = uuid.uuid4()` explicitly before constructing Contact, then pass the same value to both Contact and Deal. |
+
+---
+
+### Final state
+```
+57 passed in 60.12s (0:01:00)
+```
+
+Git: `f261e79` — pushed to origin/main.
+
+---
+
+### What comes next — Phase 1D
+
+- Notifications model + service
+- `GET /api/v1/notifications` — paginated, scoped by user
+- `PATCH /api/v1/notifications/{id}/read` — mark as read
+- `GET /api/v1/notifications/unread-count` — for polling (every 30s from frontend)
+- Event handlers in worker.py that generate Notification records for: lead.converted, deal.stage_changed, task due
+- Tests: 8 tests → target 65/65
