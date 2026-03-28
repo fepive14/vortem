@@ -12,8 +12,11 @@ from app.events.catalog import EventType
 from app.events.publisher import publish
 from app.middleware.auth import get_current_org_id, require_auth, require_roles
 from app.models.user import User, UserRole
+from app.schemas.contact import ContactRead
+from app.schemas.conversion import ConvertLeadRequest, ConvertLeadResponse
+from app.schemas.deal import DealRead
 from app.schemas.lead import LeadCreate, LeadRead, LeadUpdate
-from app.services import lead_service
+from app.services import conversion_service, lead_service
 
 router = APIRouter()
 
@@ -114,3 +117,50 @@ async def delete_lead(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
     await lead_service.delete_lead(session, lead)
     await session.commit()
+
+
+@router.post(
+    "/{lead_id}/convert",
+    response_model=ConvertLeadResponse,
+    summary="Convert lead to contact",
+    description=(
+        "Converts a lead into a Contact. Optionally creates a Deal when "
+        "create_deal=True and stage_id + pipeline_id are supplied. "
+        "Returns 400 if the lead is already converted, 404 if not found."
+    ),
+)
+async def convert_lead(
+    lead_id: uuid.UUID,
+    body: ConvertLeadRequest,
+    current_user: User = Depends(require_roles(UserRole.admin, UserRole.supervisor)),
+    session: AsyncSession = Depends(get_session),
+) -> ConvertLeadResponse:
+    org_id = get_current_org_id(current_user)
+    contact, deal = await conversion_service.convert_lead(
+        session=session,
+        organization_id=org_id,
+        lead_id=lead_id,
+        assigned_to=body.assigned_to,
+        create_deal=body.create_deal,
+        deal_name=body.deal_name,
+        stage_id=body.stage_id,
+        pipeline_id=body.pipeline_id,
+        value=body.value,
+        currency=body.currency,
+    )
+    await session.commit()
+    await session.refresh(contact)
+    if deal is not None:
+        await session.refresh(deal)
+
+    await publish(
+        session,
+        event_type=EventType.LEAD_CONVERTED,
+        payload={"lead_id": str(lead_id), "contact_id": str(contact.id)},
+        organization_id=org_id,
+        user_id=current_user.id,
+    )
+    return ConvertLeadResponse(
+        contact=ContactRead.model_validate(contact),
+        deal=DealRead.model_validate(deal) if deal is not None else None,
+    )

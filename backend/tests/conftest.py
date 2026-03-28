@@ -15,10 +15,14 @@ from app.core.config import settings
 from app.core.security import create_access_token, create_refresh_token, hash_password
 from app.db.session import get_session
 from app.main import app as _app
+from app.models.activity import Activity  # noqa: F401
 from app.models.base import Base
 from app.models.contact import Contact  # noqa: F401 — registers table with Base.metadata
+from app.models.deal import Deal  # noqa: F401
 from app.models.lead import Lead  # noqa: F401 — registers table with Base.metadata
 from app.models.organization import Organization
+from app.models.pipeline import Pipeline  # noqa: F401
+from app.models.stage import Stage  # noqa: F401
 from app.models.user import User, UserRole
 
 # ─── Test engine ──────────────────────────────────────────────────────────────
@@ -82,6 +86,16 @@ async def create_tables() -> AsyncGenerator[None, None]:
                 END IF;
             END $$;
         """))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activity_type') THEN
+                    CREATE TYPE activity_type AS ENUM (
+                        'call', 'note', 'task', 'email', 'meeting', 'voicehire_call'
+                    );
+                END IF;
+            END $$;
+        """))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with _TEST_ENGINE.begin() as conn:
@@ -90,6 +104,7 @@ async def create_tables() -> AsyncGenerator[None, None]:
         await conn.execute(text("DROP TYPE IF EXISTS contact_status"))
         await conn.execute(text("DROP TYPE IF EXISTS lead_status"))
         await conn.execute(text("DROP TYPE IF EXISTS lead_source"))
+        await conn.execute(text("DROP TYPE IF EXISTS activity_type"))
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -98,7 +113,10 @@ async def clean_tables() -> AsyncGenerator[None, None]:
     yield
     async with _TEST_ENGINE.begin() as conn:
         # Truncate in dependency order (events first, then users, then orgs).
-        await conn.execute(text("TRUNCATE TABLE events, contacts, leads, users, organizations RESTART IDENTITY CASCADE"))
+        await conn.execute(text(
+            "TRUNCATE TABLE events, activities, deals, contacts, leads, "
+            "stages, pipelines, users, organizations RESTART IDENTITY CASCADE"
+        ))
 
 
 # ─── Session fixture ──────────────────────────────────────────────────────────

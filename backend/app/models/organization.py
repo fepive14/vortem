@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,7 +19,9 @@ class Organization(Base):
     logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    # FK to Pipeline — populated in Phase 1D.  Nullable for now.
+    # FK to Pipeline — constraint is added by migration 0003 (ALTER TABLE).
+    # Kept as plain UUID here to avoid a circular FK dependency between
+    # organizations and pipelines during create_all in tests.
     pipeline_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )

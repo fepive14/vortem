@@ -21,5 +21,11 @@ class EventType:
     CONTACT_CREATED = "contact.created"
     LEAD_CREATED = "lead.created"
     LEAD_STAGE_CHANGED = "lead.stage_changed"
+    LEAD_CONVERTED = "lead.converted"
+
+    # ─── Pipelines & Deals (Phase 1C) ────────────────────────────────────────────
+    PIPELINE_CREATED = "pipeline.created"
+    DEAL_CREATED = "deal.created"
+    DEAL_STAGE_CHANGED = "deal.stage_changed"
 
     # Additional event types are appended here as new phases are implemented.
