@@ -28,4 +28,10 @@ class EventType:
     DEAL_CREATED = "deal.created"
     DEAL_STAGE_CHANGED = "deal.stage_changed"
 
+    # ─── Supervisor / Webhooks / Notifications (Phase 1D) ────────────────────────
+    LEAD_ASSIGNED = "lead.assigned"
+    LEAD_QUALIFIED = "lead.qualified"
+    VOICEHIRE_CALL_COMPLETED = "voicehire.call_completed"
+    NOTIFICATION_CREATED = "notification.created"
+
     # Additional event types are appended here as new phases are implemented.

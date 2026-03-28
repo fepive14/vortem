@@ -100,7 +100,8 @@ def upgrade() -> None:
             processed_at    TIMESTAMPTZ,
             failed_at       TIMESTAMPTZ,
             error           TEXT,
-            created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
 

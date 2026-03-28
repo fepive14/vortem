@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
 
+    # ─── Integrations ─────────────────────────────────────────────────────────
+    VOICEHIRE_WEBHOOK_SECRET: str = "change-me-in-production"
+
     # ─── Derived helpers ──────────────────────────────────────────────────────
 
     @field_validator("DATABASE_URL")

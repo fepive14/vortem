@@ -20,6 +20,7 @@ from app.models.base import Base
 from app.models.contact import Contact  # noqa: F401 — registers table with Base.metadata
 from app.models.deal import Deal  # noqa: F401
 from app.models.lead import Lead  # noqa: F401 — registers table with Base.metadata
+from app.models.notification import Notification  # noqa: F401
 from app.models.organization import Organization
 from app.models.pipeline import Pipeline  # noqa: F401
 from app.models.stage import Stage  # noqa: F401
@@ -96,15 +97,30 @@ async def create_tables() -> AsyncGenerator[None, None]:
                 END IF;
             END $$;
         """))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_priority') THEN
+                    CREATE TYPE notification_priority AS ENUM ('normal', 'high');
+                END IF;
+            END $$;
+        """))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with _TEST_ENGINE.begin() as conn:
+        # Drop the migration-only FK before drop_all so that SQLAlchemy can
+        # drop 'pipelines' without hitting a dependent-object error.
+        await conn.execute(text(
+            "ALTER TABLE organizations "
+            "DROP CONSTRAINT IF EXISTS fk_organizations_pipeline_id"
+        ))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.execute(text("DROP TYPE IF EXISTS user_role"))
         await conn.execute(text("DROP TYPE IF EXISTS contact_status"))
         await conn.execute(text("DROP TYPE IF EXISTS lead_status"))
         await conn.execute(text("DROP TYPE IF EXISTS lead_source"))
         await conn.execute(text("DROP TYPE IF EXISTS activity_type"))
+        await conn.execute(text("DROP TYPE IF EXISTS notification_priority"))
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -114,7 +130,7 @@ async def clean_tables() -> AsyncGenerator[None, None]:
     async with _TEST_ENGINE.begin() as conn:
         # Truncate in dependency order (events first, then users, then orgs).
         await conn.execute(text(
-            "TRUNCATE TABLE events, activities, deals, contacts, leads, "
+            "TRUNCATE TABLE notifications, events, activities, deals, contacts, leads, "
             "stages, pipelines, users, organizations RESTART IDENTITY CASCADE"
         ))
 

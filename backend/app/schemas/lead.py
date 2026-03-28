@@ -52,3 +52,11 @@ class LeadRead(BaseModel):
     campaign_id: uuid.UUID | None
     assigned_to: uuid.UUID | None
     voicehire_data: dict
+
+
+class LeadAssignRequest(BaseModel):
+    assigned_to: uuid.UUID
+
+
+class LeadSupervisorView(LeadRead):
+    assigned_to_name: str | None = None
