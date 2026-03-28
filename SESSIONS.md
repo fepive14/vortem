@@ -513,3 +513,48 @@ Git: `9d8cee3` — pushed to origin/main.
 - Reports: conversion funnel, agent performance, activity by campaign
 - Update architecture doc to reflect actual phases built vs original plan
 - Backend complete → ready for frontend (Next.js)
+
+---
+
+## Session 5 — Phase 1E: User management, reports, backend complete
+
+**Date:** 2026-03-28
+**Commit:** 8ef8a16
+
+### What was built
+
+**Phase 1E — User Management & Reports (17 new tests, 93/93 total)**
+
+New files:
+- `backend/app/schemas/user.py` — added `UserCreate`, `UserUpdate`, `UserRead` schemas
+- `backend/app/services/user_service.py` — `create_user`, `list_users`, `get_user`, `update_user`, `deactivate_user`
+- `backend/app/api/v1/users.py` — 5 endpoints: `GET /users`, `GET /users/{id}`, `POST /users`, `PATCH /users/{id}`, `DELETE /users/{id}`
+- `backend/app/services/report_service.py` — `lead_funnel`, `agent_performance`, `activity_by_campaign`
+- `backend/app/api/v1/reports.py` — 3 endpoints: `GET /reports/funnel`, `GET /reports/agent-performance`, `GET /reports/activity-by-campaign`
+- `backend/tests/test_users.py` — 9 tests
+- `backend/tests/test_reports.py` — 8 tests
+
+Modified:
+- `backend/app/api/v1/router.py` — added `users` and `reports` routers
+
+### Decisions
+
+| Decision | Rationale |
+|---|---|
+| `DELETE /users/{id}` does soft-delete (sets `is_active=False`), not hard delete | Preserves audit history; consistent with `deactivate_user` service pattern |
+| Reports scoped to admin + supervisor roles | Agents should not see aggregate performance data of peers |
+| `activity_by_campaign` counts leads per `campaign_id` | Activities don't have a direct `campaign_id`; leads are the campaign-attributed entity |
+| Agent performance uses two separate queries (activities + converted leads) | Cleaner than a complex JOIN; both queries are simple and fast |
+
+### Final state
+```
+93 passed in 97.62s (0:01:37)
+```
+
+Git: `8ef8a16` — pushed to origin/main.
+
+---
+
+### What comes next — Frontend (Next.js)
+
+Backend is complete. All 93 tests pass across all phases (1A–1E).
