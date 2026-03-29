@@ -994,3 +994,49 @@ Remaining items before first client deployment:
 - End-to-end test with real client data (seed a pipeline, stages, users, leads via /docs)
 - Update arquitectura_vortem_v2_0.docx to mark frontend phases 2A–2E as complete
 - Production hardening: set SECRET_KEY, VOICEHIRE_WEBHOOK_SECRET, secure=True in .env before client handoff
+
+---
+
+## Session 11 — End-to-End Test: primer arranque desde cero
+
+**Date:** 2026-03-29
+**Phase:** Post-MVP
+**Status:** Complete — sistema funcional end-to-end en local
+
+---
+
+### Lo que se hizo
+
+Test completo de instalación desde cero en Windows 11 con Docker Desktop.
+
+Pasos ejecutados: `docker compose up -d` (5 servicios), migraciones (0001→0004), bootstrap vía `/api/v1/setup` (org "Vortem Demo" + admin global), seed manual vía `/docs` (1 pipeline con 4 stages, 1 supervisor, 1 agente, 3 leads), login en `http://localhost:3000` — dashboard funcional, leads visibles, todas las pestañas cargan.
+
+---
+
+### Bugs encontrados y resueltos
+
+| Bug | Causa | Fix |
+|---|---|---|
+| `relation "users" does not exist` en bootstrap | Volumen de DB en estado inconsistente | `docker compose down -v` y reinicio limpio |
+| `This endpoint requires an organization context` | Admin global no tiene `organization_id` y no puede operar endpoints de negocio | Crear usuario admin normal con org vía INSERT directo en psql |
+| Hash de password corrupto | PowerShell interpola `$` en strings con comillas dobles, truncando el hash bcrypt | Insertar el hash desde sesión interactiva de psql |
+| Login falla — `ERR_NAME_NOT_RESOLVED` | `NEXT_PUBLIC_API_URL` resolvía a `http://backend:8000` que el browser no conoce | Agregar `rewrites()` en `next.config.ts` para proxear `/api/v1/*` → `http://backend:8000/api/v1/*` y cambiar `baseURL` en `api.ts` a `''` |
+| Loop infinito en /login | Volumen anónimo `/app/.next` persistía el bundle viejo entre reinicios | `docker compose rm -f frontend` para destruir el volumen anónimo |
+
+---
+
+### Decisiones tomadas
+
+El bootstrap crea un admin global sin `organization_id`. Para operar el sistema hay que crear manualmente un usuario admin con org — esto debe documentarse en DEPLOYMENT.md como paso adicional antes de entrega al cliente.
+
+El rewrite en `next.config.ts` es la arquitectura correcta y permanente para producción. `NEXT_PUBLIC_API_URL` no debe usarse para llamadas desde el browser en entorno Docker.
+
+---
+
+### Estado final
+5 servicios Docker corriendo
+93 backend tests passing
+Frontend: login funcional, dashboard cargando, leads visibles
+Seed: 1 pipeline, 4 stages, 1 supervisor, 1 agente, 3 leads
+
+Git: pendiente de commit.

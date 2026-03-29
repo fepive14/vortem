@@ -24,7 +24,7 @@ export function useLogin() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.resetQueries({ queryKey: ['me'] });
       router.push('/dashboard');
     },
   });
