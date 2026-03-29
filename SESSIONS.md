@@ -644,3 +644,100 @@ Git: `878201a` — pushed to origin/main.
 - Supervisor queue page: `/dashboard/leads/queue` — leads calificados sin asignar, assign modal
 - Lead detail page: info + activity timeline + convert button
 - Lead create/edit form
+
+---
+
+## Session 6 — Phase 2B: Leads List, Detail, Supervisor Queue
+
+**Date:** 2026-03-28
+**Phase:** 2B
+**Status:** Complete — 93/93 backend tests passing, frontend running on port 3000
+
+---
+
+### What was built
+
+#### Hooks
+| File | Description |
+|---|---|
+| `frontend/hooks/useLeads.ts` | useLeads (with status/skip/limit params), useLead, useCreateLead, useUpdateLead, useDeleteLead, useConvertLead. |
+| `frontend/hooks/useSupervisor.ts` | useLeadsQueue (30s auto-refresh), useAssignLead. |
+| `frontend/hooks/useUsers.ts` | useUsers with optional role filter (?role=agent for assign modal). |
+| `frontend/hooks/usePipelines.ts` | usePipelines, useStages (depends on pipeline_id — cascade select). |
+
+#### UI components
+| File | Description |
+|---|---|
+| `frontend/components/ui/Modal.tsx` | Generic modal — backdrop + Escape key close, accessible. |
+| `frontend/components/ui/Toast.tsx` + `ToastProvider` | Context-based toast system — auto-dismiss 3s, stacked, bottom-right. success/error variants. |
+| `frontend/components/ui/Select.tsx` | Styled select wrapper (Tailwind). |
+| `frontend/components/ui/Table.tsx` | Generic table with typed column definitions, loading skeleton rows, empty state slot. |
+
+#### Pages
+| File | Description |
+|---|---|
+| `frontend/app/dashboard/leads/page.tsx` | Leads table with client-side search (name/email/phone) + status/source dropdowns. "Nuevo Lead" button (hidden for viewer). Pagination with skip/limit. |
+| `frontend/app/dashboard/leads/[id]/page.tsx` | Two-column detail: info card + collapsible voicehire_data viewer + activity placeholder. Actions panel: Convert / Assign / status change / Delete. Role-gated buttons. |
+| `frontend/app/dashboard/leads/queue/page.tsx` | Supervisor/admin only — role check on mount, redirect if agent/viewer. Auto-refreshing queue table. Inline Assign button per row. Empty state with checkmark illustration. |
+
+#### Lead modals
+| File | Description |
+|---|---|
+| `frontend/components/leads/LeadFormModal.tsx` | Shared create/edit modal — react-hook-form + zod, first_name/last_name required, email optional with format validation. |
+| `frontend/components/leads/AssignLeadModal.tsx` | Agent selector from /api/v1/users?role=agent. On success: invalidate queue + leads queries, show toast. |
+| `frontend/components/leads/ConvertLeadModal.tsx` | assigned_to selector + optional deal creation (pipeline → stage cascade). On success: redirect to /dashboard/contacts/{contact_id}. |
+
+#### Sidebar update
+| File | Description |
+|---|---|
+| `frontend/components/layout/Sidebar.tsx` | Added "Cola de Asignación" sub-item under Leads with live queue count badge. Visible to admin/supervisor only. |
+
+#### lib updates
+| File | Description |
+|---|---|
+| `frontend/lib/types.ts` | Added voicehire_data field to Lead interface (caught by TypeScript production build check). |
+| `frontend/lib/utils.ts` | Added relativeTime() using Intl.RelativeTimeFormat with 'es' locale. Added statusColor() mapping status strings to Tailwind classes. |
+
+---
+
+### Architecture decisions
+
+**Client-side search over server-side**
+The leads list fetches 50 records and filters client-side. For the expected volume (100–1000 leads/day), 50 per page is enough. Server-side search can be added later if needed without changing the component API.
+
+**ToastProvider via React context**
+Toast is injected at the dashboard layout level so any child page can call `useToast()` without prop drilling. This pattern will be reused for all future pages.
+
+**Pipeline → Stage cascade**
+In ConvertLeadModal, the stages query is enabled only when a pipeline_id is selected (`enabled: !!pipelineId`). This avoids a wasted API call and keeps the UX clean — stage select is disabled until pipeline is chosen.
+
+**Role check on queue page**
+The supervisor queue page checks `user.role` on the client after `useMe` resolves. If agent or viewer, it redirects to `/dashboard/leads`. This is a UX guard — the real permission enforcement is on the backend (403 from the API).
+
+---
+
+### Bugs found and resolved
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| TypeScript build error on Lead type | `voicehire_data` field was missing from the Lead interface in `lib/types.ts`. The TypeScript production build caught it before commit. | Added `voicehire_data: Record<string, unknown>` to the Lead interface. |
+
+---
+
+### Final state
+```
+93 backend tests passing
+5 Docker services running
+Frontend: /dashboard/leads, /dashboard/leads/[id], /dashboard/leads/queue — all functional
+```
+
+Git: `3acced3` — pushed to origin/main.
+
+---
+
+### What comes next — Phase 2C
+
+- Contacts list page: table with search + status filter
+- Contact detail page: info card + lead origin link + activity placeholder
+- Contact create/edit modal
+- Quick actions: change status, assign to user
