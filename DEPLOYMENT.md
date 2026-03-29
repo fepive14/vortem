@@ -103,6 +103,51 @@ Change the admin password immediately after first login.
 
 ---
 
+## Step 5b — Create organization admin user
+
+The bootstrap creates a global admin (`is_global_admin=true`) with no `organization_id`. This user cannot operate business endpoints (pipelines, users, leads, etc.). You must create a regular admin user scoped to the organization before using the system.
+
+First, get the organization ID created in Step 5:
+```bash
+docker compose exec db psql -U vortem -d vortem -c "SELECT id, name FROM organizations;"
+```
+
+Then open an interactive psql session to avoid shell interpolation of `$` characters in the bcrypt hash:
+```bash
+docker compose exec db psql -U vortem -d vortem
+```
+
+Inside psql, generate and insert the user (replace `<org_id>` with the UUID from above):
+```sql
+INSERT INTO users (id, email, full_name, hashed_password, role, is_active, is_global_admin, organization_id, timezone, created_at, updated_at)
+VALUES (
+  gen_random_uuid(),
+  'admin@yourcompany.com',
+  'Administrator',
+  '$2b$12$replacethiswitharealhashgeneratedbythebackend',
+  'admin',
+  true,
+  false,
+  '<org_id>',
+  'America/Bogota',
+  now(),
+  now()
+);
+```
+
+To generate a valid bcrypt hash for your chosen password:
+```bash
+docker compose exec backend python -c "from app.core.security import hash_password; print(repr(hash_password('your-password-here')))"
+```
+
+Copy the output (including the `$2b$12$...` prefix) and paste it into the psql INSERT above.
+
+> **Important:** Always run the INSERT from inside an interactive psql session (`docker compose exec db psql ...`), never by passing it as a `-c` argument from PowerShell or bash. Shell environments interpolate `$` characters and will corrupt the bcrypt hash silently.
+
+Exit psql with `\q`. You can now log in to the frontend with this user.
+
+---
+
 ## Step 6 — Verify the installation
 
 | Check | URL |
