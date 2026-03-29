@@ -2,19 +2,23 @@
 
 import { useState, KeyboardEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronRight, Edit, Trash2, Link2, MessageSquare, X } from 'lucide-react';
+import { ChevronRight, Edit, Trash2, Link2, MessageSquare, X, Eye, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { ContactFormModal } from '@/components/contacts/ContactFormModal';
+import { DealDrawer } from '@/components/deals/DealDrawer';
+import { DealFormModal } from '@/components/deals/DealFormModal';
 import { useContact, useUpdateContact, useDeleteContact } from '@/hooks/useContacts';
+import { useDeals } from '@/hooks/useDeals';
+import { useStages } from '@/hooks/usePipelines';
 import { useUsers } from '@/hooks/useUsers';
 import { useMe } from '@/hooks/useAuth';
-import { relativeTime } from '@/lib/utils';
+import { formatCurrency, relativeTime } from '@/lib/utils';
 import Link from 'next/link';
-import type { Contact } from '@/lib/types';
+import type { Contact, Deal } from '@/lib/types';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activo' },
@@ -28,6 +32,12 @@ const STATUS_LABEL: Record<string, string> = {
   do_not_contact: 'No contactar',
 };
 
+function StageCell({ pipelineId, stageId }: { pipelineId: string; stageId: string }) {
+  const { data: stages = [] } = useStages(pipelineId);
+  const stage = stages.find((s) => s.id === stageId);
+  return <span className="text-gray-600">{stage?.name ?? '—'}</span>;
+}
+
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -38,8 +48,11 @@ export default function ContactDetailPage() {
   const deleteContact = useDeleteContact();
   const { data: users = [] } = useUsers();
 
+  const { data: allDeals = [] } = useDeals();
   const [editOpen, setEditOpen] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  const [dealCreateOpen, setDealCreateOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -54,6 +67,7 @@ export default function ContactDetailPage() {
   }
 
   const isAdminOrSupervisor = me?.role === 'admin' || me?.role === 'supervisor';
+  const contactDeals = allDeals.filter((d) => d.contact_id === contact.id);
 
   const userOptions = [
     { value: '', label: 'Sin asignar' },
@@ -220,6 +234,62 @@ export default function ContactDetailPage() {
             </Card>
           )}
 
+          {/* Deals section */}
+          <Card className="p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-700">Deals</h2>
+              {me?.role !== 'viewer' && (
+                <button
+                  onClick={() => setDealCreateOpen(true)}
+                  className="flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nuevo Deal
+                </button>
+              )}
+            </div>
+            {contactDeals.length === 0 ? (
+              <p className="py-4 text-center text-sm text-gray-400">
+                No hay deals para este contacto.
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs font-medium text-gray-500">
+                    <th className="pb-2 pr-4">Nombre</th>
+                    <th className="pb-2 pr-4">Etapa</th>
+                    <th className="pb-2 pr-4">Valor</th>
+                    <th className="pb-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {contactDeals.map((deal) => (
+                    <tr key={deal.id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 pr-4 font-medium text-gray-900 max-w-[160px] truncate">
+                        {deal.name}
+                      </td>
+                      <td className="py-2 pr-4 text-xs">
+                        <StageCell pipelineId={deal.pipeline_id} stageId={deal.stage_id} />
+                      </td>
+                      <td className="py-2 pr-4 text-xs text-gray-500">
+                        {formatCurrency(deal.value, deal.currency)}
+                      </td>
+                      <td className="py-2">
+                        <button
+                          onClick={() => setActiveDeal(deal)}
+                          className="text-blue-600 hover:text-blue-800"
+                          aria-label="Ver deal"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+
           {/* Activity placeholder */}
           <Card className="p-6">
             <h2 className="mb-4 text-sm font-semibold text-gray-700">Actividades</h2>
@@ -277,6 +347,14 @@ export default function ContactDetailPage() {
         isOpen={editOpen}
         onClose={() => setEditOpen(false)}
         contact={contact}
+      />
+
+      <DealDrawer deal={activeDeal} onClose={() => setActiveDeal(null)} />
+
+      <DealFormModal
+        isOpen={dealCreateOpen}
+        onClose={() => setDealCreateOpen(false)}
+        defaultContactId={contact.id}
       />
     </div>
   );
