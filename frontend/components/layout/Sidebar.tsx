@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { useLogout } from '@/hooks/useAuth';
+import { useLeadsQueue } from '@/hooks/useSupervisor';
 import type { User } from '@/lib/types';
 
 const navItems = [
@@ -29,9 +30,37 @@ interface SidebarProps {
   user: User;
 }
 
+function QueueSubItem({ pathname }: { pathname: string }) {
+  const { data: queue } = useLeadsQueue();
+  const count = queue?.length ?? 0;
+  const isActive = pathname === '/dashboard/leads/queue';
+
+  return (
+    <li>
+      <Link
+        href="/dashboard/leads/queue"
+        className={cn(
+          'flex items-center gap-2 rounded-md py-1.5 pl-10 pr-3 text-sm transition-colors',
+          isActive
+            ? 'bg-blue-50 font-medium text-blue-700'
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        )}
+      >
+        <span className="flex-1">Cola de Asignación</span>
+        {count > 0 && (
+          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            {count}
+          </span>
+        )}
+      </Link>
+    </li>
+  );
+}
+
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const logout = useLogout();
+  const isAdminOrSupervisor = user.role === 'admin' || user.role === 'supervisor';
 
   const allNavItems = [
     ...navItems,
@@ -52,7 +81,11 @@ export function Sidebar({ user }: SidebarProps) {
         <ul className="space-y-1">
           {allNavItems.map(({ href, label, icon: Icon }) => {
             const isActive =
-              href === '/dashboard' ? pathname === href : pathname.startsWith(href);
+              href === '/dashboard'
+                ? pathname === href
+                : href === '/dashboard/leads'
+                ? pathname === href || (pathname.startsWith(href) && pathname !== '/dashboard/leads/queue')
+                : pathname.startsWith(href);
             return (
               <li key={href}>
                 <Link
@@ -67,6 +100,13 @@ export function Sidebar({ user }: SidebarProps) {
                   <Icon className="h-4 w-4 shrink-0" />
                   {label}
                 </Link>
+
+                {/* Queue sub-item under Leads */}
+                {href === '/dashboard/leads' && isAdminOrSupervisor && (
+                  <ul className="mt-0.5">
+                    <QueueSubItem pathname={pathname} />
+                  </ul>
+                )}
               </li>
             );
           })}

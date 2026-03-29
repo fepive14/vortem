@@ -29,6 +29,7 @@ export interface Lead {
   source: 'csv_import' | 'manual' | 'api' | 'voicehire';
   assigned_to: string | null;
   campaign_id: string | null;
+  voicehire_data: Record<string, unknown>;
   organization_id: string;
   created_at: string;
   updated_at: string;
@@ -79,6 +80,29 @@ export interface Notification {
   entity_id: string | null;
   read_at: string | null;
   created_at: string;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  organization_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Stage {
+  id: string;
+  name: string;
+  pipeline_id: string;
+  order: number;
+  color: string | null;
+  probability: number;
+  is_won: boolean;
+  is_lost: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ApiError {
