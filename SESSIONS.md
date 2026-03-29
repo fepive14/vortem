@@ -810,3 +810,86 @@ Git: `01add3a` — pushed to origin/main.
 - Deal detail drawer (slide-in panel, 480px, auto-save on blur)
 - Deal create modal (from kanban columns and from contact detail page)
 - Contact detail page: add Deals section showing deals linked to the contact
+
+---
+
+## Session 8 — Phase 2D: Deals Kanban, Drag-and-Drop, Deal Drawer
+
+**Date:** 2026-03-28
+**Phase:** 2D
+**Status:** Complete — 93/93 backend tests passing, TypeScript build clean
+
+---
+
+### What was built
+
+#### Hooks
+| File | Description |
+|---|---|
+| `frontend/hooks/useDeals.ts` | useDeals (pipeline_id/skip/limit params), useDeal, useCreateDeal, useUpdateDeal, useDeleteDeal. queryKey: ['deals', params] / ['deals', id]. |
+
+#### Components
+| File | Description |
+|---|---|
+| `frontend/components/deals/DealCard.tsx` | Draggable deal card. Shows name, formatted value, assigned-to initials avatar (deterministic color from user id). `draggable="true"` with HTML5 drag API. |
+| `frontend/components/deals/DealDrawer.tsx` | 480px slide-in panel from right. Backdrop click to close. Inline name edit (Enter/blur to save). Stage progress bar + prev/next stage buttons. Contact link. Value + currency (auto-save on blur). Assigned to (auto-save on change). Expected close date (auto-save on blur). Notes textarea (800ms debounced auto-save). Delete button (admin/supervisor only, window.confirm). |
+| `frontend/components/deals/DealFormModal.tsx` | Create/edit modal. Fields: name*, contact_id* (select from useContacts), pipeline_id*, stage_id* (cascade), value, currency (USD/COP/EUR/MXN), assigned_to, expected_close_date, notes. react-hook-form + zod. |
+
+#### Pages
+| File | Description |
+|---|---|
+| `frontend/app/dashboard/deals/page.tsx` | Kanban board. Pipeline selector (localStorage persistence). Horizontal scroll. One column per stage (ordered by stage.order ASC). Column header: stage name + deal count badge + total value sum. Optimistic drag-and-drop: updates local cache immediately, reverts on API error with toast. Skeleton loading (3 columns × 2 cards). Empty column: dashed border placeholder. "Agregar deal" button per column (hidden for viewer). |
+| `frontend/app/dashboard/contacts/[id]/page.tsx` | Added Deals section: fetches useDeals(), filters client-side by contact_id. Compact table with stage name (StageCell resolver component) + value + DealDrawer link. "Nuevo Deal" button pre-fills contact_id. |
+
+#### Utils
+| File | Description |
+|---|---|
+| `frontend/lib/utils.ts` | Added formatCurrency() using Intl.NumberFormat. Added initialsColor() — deterministic Tailwind bg color from userId (8 color palette). |
+
+---
+
+### Architecture decisions
+
+**HTML5 drag API over external library**
+Used native `draggable`, `onDragStart`, `onDragOver`, `onDrop` to avoid adding a dependency (react-beautiful-dnd, dnd-kit). Works for MVP volume. If the kanban grows complex, dnd-kit can be swapped in later.
+
+**Optimistic updates on drag**
+On drop, the deal's stage_id is updated in the TanStack Query cache immediately before the API call resolves. If the API returns an error, the cache is rolled back and an error toast is shown. This makes the board feel instant.
+
+**Auto-save in drawer without a Save button**
+Every editable field in DealDrawer saves on blur/change. Notes use 800ms debounce to avoid hammering the API on every keystroke. A subtle "Guardando..." indicator appears while the mutation is in-flight.
+
+**StageCell resolver component**
+The contact detail Deals section needs stage names, but deals only carry stage_id. StageCell is a small component that calls useStages(pipeline_id) and resolves the name client-side. Avoids adding a join to the backend for MVP.
+
+**localStorage for pipeline selection**
+Selected pipeline persists across page reloads via `vortem_selected_pipeline` in localStorage. Simple and effective — no need for server-side user preferences at this stage.
+
+---
+
+### Bugs found and resolved
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| TypeScript resolver type conflict on currency field | `z.string().default('USD')` in the zod schema produces a type incompatible with react-hook-form's resolver — the field is inferred as `string` not `string \| undefined`, causing a type mismatch. | Changed to `z.string().optional()` and added `?? 'USD'` fallback in the Select value prop and in the onSubmit handler before calling the API. |
+
+---
+
+### Final state
+```
+93 backend tests passing
+TypeScript build: clean
+5 Docker services running
+Frontend routes: /dashboard/deals — kanban functional with drag-and-drop
+                /dashboard/contacts/[id] — Deals section added
+```
+
+Git: `e42dd21` — pushed to origin/main.
+
+---
+
+### What comes next — Phase 2E
+
+- Reports page: funnel chart, agent performance table, activity by campaign table
+- Settings page: user management (list, invite, deactivate) + pipeline/stage configuration
+- Final polish: 404 page, error boundaries, responsive sidebar (mobile)
