@@ -45,6 +45,7 @@ export interface Contact {
   position: string | null;
   country: string | null;
   status: 'active' | 'inactive' | 'do_not_contact';
+  lead_id: string | null;
   assigned_to: string | null;
   tags: string[];
   custom_fields: Record<string, unknown>;
