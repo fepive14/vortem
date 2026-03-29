@@ -558,3 +558,89 @@ Git: `8ef8a16` — pushed to origin/main.
 ### What comes next — Frontend (Next.js)
 
 Backend is complete. All 93 tests pass across all phases (1A–1E).
+
+---
+
+## Session 5 — Phase 2A: Frontend Setup, Login, Dashboard Layout
+
+**Date:** 2026-03-28
+**Phase:** 2A
+**Status:** Complete — 93/93 backend tests passing, frontend running on port 3000
+
+---
+
+### What was built
+
+#### Project setup
+| File | Description |
+|---|---|
+| `frontend/` | Next.js 14 (App Router), TypeScript, Tailwind CSS, ESLint. |
+| `frontend/Dockerfile` | Multi-stage: base → deps → development/production. Hot reload in dev on port 3000. |
+| `docker-compose.yml` | Added frontend service on port 3000. Depends on backend. Volume mounts for hot reload. |
+
+#### Core libraries
+| File | Description |
+|---|---|
+| `frontend/lib/api.ts` | Axios instance with `withCredentials: true` and 401→redirect interceptor. |
+| `frontend/lib/types.ts` | TypeScript interfaces mirroring backend schemas: User, Organization, Lead, Contact, Deal, Notification, ApiError. |
+| `frontend/lib/query-client.ts` | TanStack Query client — 1min stale, retry 1, no refetch on focus. |
+| `frontend/lib/utils.ts` | `cn()` helper (clsx + tailwind-merge). |
+
+#### Hooks
+| File | Description |
+|---|---|
+| `frontend/hooks/useAuth.ts` | `useMe` (GET /auth/me), `useLogin` (POST /auth/login → redirect dashboard), `useLogout` (POST /auth/logout → redirect login). |
+| `frontend/hooks/useNotifications.ts` | `useNotifications` (poll 30s), `useUnreadCount` (poll 30s), `useMarkAsRead`. |
+
+#### Components
+| File | Description |
+|---|---|
+| `frontend/components/ui/Spinner.tsx` | SVG spinner with size prop. |
+| `frontend/components/ui/Badge.tsx` | Color-mapped badge for roles and statuses. |
+| `frontend/components/ui/Card.tsx` | White card with shadow, accepts className. |
+| `frontend/components/layout/Sidebar.tsx` | Fixed 240px sidebar. Nav links with active state (usePathname). Role-gated Settings link (admin only). User info + logout button at bottom. |
+| `frontend/components/layout/NotificationPanel.tsx` | Bell icon with unread badge. Dropdown with last 10 notifications. Mark-as-read button. High-priority notifications with orange left border. |
+
+#### Pages
+| File | Description |
+|---|---|
+| `frontend/app/layout.tsx` | Root layout wrapped in QueryClientProvider + ReactQueryDevtools. |
+| `frontend/app/page.tsx` | Root redirect: authenticated → /dashboard, unauthenticated → /login. |
+| `frontend/app/login/page.tsx` | Login form (react-hook-form + zod). Email + password validation. Loading state on submit. Server error display. Already-logged-in redirect. |
+| `frontend/app/dashboard/layout.tsx` | Protected route shell. useMe → spinner while loading, redirect on 401. Sidebar + NotificationPanel + main content area. |
+| `frontend/app/dashboard/page.tsx` | Dashboard home with 4 stat cards (Total Leads, Leads Calificados, Contactos, Deals Activos) fetched from /reports/funnel. Loading skeletons. |
+
+---
+
+### Architecture decisions
+
+**withCredentials on all requests**
+The backend sets httpOnly cookies. `axios` does not send cookies cross-origin by default. `withCredentials: true` on the Axios instance ensures cookies are sent on every request without needing to pass tokens manually.
+
+**401 interceptor**
+Any 401 response triggers a client-side redirect to /login and clears stale UI. This handles token expiration transparently without per-component error handling.
+
+**Polling over WebSocket for notifications**
+Notifications poll every 30s via `refetchInterval`. This matches the architecture decision in v2.0 doc — WebSocket comes in Phase 3C. 30s is imperceptible for notifications.
+
+**QueryClientProvider in root layout**
+The QueryClient is instantiated in a separate `lib/query-client.ts` to avoid re-creation on re-renders, then provided at the root layout level so all pages share the same cache.
+
+---
+
+### Final state
+```
+93 backend tests passing
+5 Docker services running: db:5433, redis:6380, backend:8000, worker, frontend:3000
+```
+
+Git: `878201a` — pushed to origin/main.
+
+---
+
+### What comes next — Phase 2B
+
+- Leads list page: table with filters (status, source, search), pagination
+- Supervisor queue page: `/dashboard/leads/queue` — leads calificados sin asignar, assign modal
+- Lead detail page: info + activity timeline + convert button
+- Lead create/edit form
