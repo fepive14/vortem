@@ -748,7 +748,7 @@ Git: `3acced3` — pushed to origin/main.
 
 **Date:** 2026-03-28
 **Phase:** 2C
-**Status:** Complete — 93/93 backend tests passing, TypeScript build clean (9 routes, no errors)
+**Status:** Complete — 93/93 backend tests passing, TypeScript build clean (9 routes, 0 errors)
 
 ---
 
@@ -763,31 +763,31 @@ Git: `3acced3` — pushed to origin/main.
 | File | Description |
 |---|---|
 | `frontend/app/dashboard/contacts/page.tsx` | Contacts table with client-side search (name/email/company) + status filter. "Nuevo Contacto" button (hidden for viewer). Loading skeletons + empty state. |
-| `frontend/app/dashboard/contacts/[id]/page.tsx` | Two-column detail: info card (name, status badge, email, phone, company, position, country) + tag pills with inline add + lead origin card (link to lead if lead_id set) + activity placeholder. Right column: edit button, status change dropdown, assign dropdown, delete (admin/supervisor only with confirm dialog). |
+| `frontend/app/dashboard/contacts/[id]/page.tsx` | Two-column detail: info card (name, status badge, email, phone, company, position, country) + inline tag editor (pills + Enter to add) + lead origin card (link to /dashboard/leads/{lead_id} if lead_id set) + activity placeholder. Right column: edit button, status dropdown, assign dropdown, delete with confirm dialog (admin/supervisor only) → redirect to /dashboard/contacts on delete. |
 
 #### Modals
 | File | Description |
 |---|---|
-| `frontend/components/contacts/ContactFormModal.tsx` | Create/edit modal — react-hook-form + zod. Fields: first_name*, last_name*, email (optional, validated), phone, company, position, country, status (edit only), assigned_to. |
+| `frontend/components/contacts/ContactFormModal.tsx` | Create/edit modal — react-hook-form + zod. Fields: first_name* (required), last_name* (required), email (optional, validated), phone, company, position, country, status (edit only, default 'active' on create), assigned_to. Same pattern as LeadFormModal. |
 
 ---
 
 ### Architecture decisions
 
 **Tags as inline edit**
-Tags are rendered as colored pills on the detail page. Adding a tag uses an inline input (press Enter) that calls useUpdateContact with the new tags array. No separate endpoint — the PATCH /contacts/{id} handles it via the existing update flow.
+Tags render as colored pills on the detail page. Adding a tag uses an inline input (press Enter) that calls useUpdateContact with the updated tags array. No separate endpoint — the existing PATCH /contacts/{id} handles the full update.
 
 **Lead origin card**
-If `contact.lead_id` is set, the detail page renders a link card pointing to `/dashboard/leads/{lead_id}`. This closes the loop between the conversion flow (Lead → Contact) and the UI — a user can always trace a contact back to its VoiceHire origin.
+If `contact.lead_id` is set, the detail page renders a card pointing to `/dashboard/leads/{lead_id}`. This closes the loop between the conversion flow and the UI — a user can always trace a contact back to its VoiceHire lead origin.
 
-**Delete with confirm dialog**
-The delete button shows a native `window.confirm()` dialog before calling `useDeleteContact`. On confirmation, it deletes and redirects to `/dashboard/contacts`. Simple and effective for MVP — no need for a custom confirm modal at this stage.
+**Delete with window.confirm**
+The delete button calls `window.confirm()` before executing `useDeleteContact`. MVP-appropriate — no need for a custom confirm modal at this stage. On confirmation, deletes and redirects to `/dashboard/contacts`.
 
 ---
 
 ### Bugs found and resolved
 
-None — TypeScript build caught no errors. Clean session.
+None — TypeScript build clean, no runtime errors encountered.
 
 ---
 
@@ -796,7 +796,7 @@ None — TypeScript build caught no errors. Clean session.
 93 backend tests passing
 TypeScript build: 9 routes, 0 errors
 5 Docker services running
-Frontend routes operational: /dashboard/contacts, /dashboard/contacts/[id]
+Frontend routes: /dashboard/contacts, /dashboard/contacts/[id] — functional
 ```
 
 Git: `01add3a` — pushed to origin/main.
@@ -806,6 +806,7 @@ Git: `01add3a` — pushed to origin/main.
 ### What comes next — Phase 2D
 
 - Deals kanban board: columns = pipeline stages, cards = deals
-- Drag-and-drop to move deals between stages (PATCH /deals/{id} with new stage_id)
-- Deal create modal (from contacts detail page and from kanban)
-- Deal detail drawer (slide-in panel, not a separate page)
+- Drag-and-drop (HTML5 API, no external library) to move deals between stages
+- Deal detail drawer (slide-in panel, 480px, auto-save on blur)
+- Deal create modal (from kanban columns and from contact detail page)
+- Contact detail page: add Deals section showing deals linked to the contact
