@@ -561,7 +561,7 @@ Backend is complete. All 93 tests pass across all phases (1A–1E).
 
 ---
 
-## Session 5 — Phase 2A: Frontend Setup, Login, Dashboard Layout
+## Session 6 — Phase 2A: Frontend Setup, Login, Dashboard Layout
 
 **Date:** 2026-03-28
 **Phase:** 2A
@@ -647,7 +647,7 @@ Git: `878201a` — pushed to origin/main.
 
 ---
 
-## Session 6 — Phase 2B: Leads List, Detail, Supervisor Queue
+## Session 7 — Phase 2B: Leads List, Detail, Supervisor Queue
 
 **Date:** 2026-03-28
 **Phase:** 2B
@@ -744,7 +744,7 @@ Git: `3acced3` — pushed to origin/main.
 
 ---
 
-## Session 7 — Phase 2C: Contacts List, Detail, Create/Edit
+## Session 8 — Phase 2C: Contacts List, Detail, Create/Edit
 
 **Date:** 2026-03-28
 **Phase:** 2C
@@ -813,7 +813,7 @@ Git: `01add3a` — pushed to origin/main.
 
 ---
 
-## Session 8 — Phase 2D: Deals Kanban, Drag-and-Drop, Deal Drawer
+## Session 9 — Phase 2D: Deals Kanban, Drag-and-Drop, Deal Drawer
 
 **Date:** 2026-03-28
 **Phase:** 2D
