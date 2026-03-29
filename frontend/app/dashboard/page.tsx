@@ -1,17 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { useMe } from '@/hooks/useAuth';
+import { useFunnel } from '@/hooks/useReports';
 import { Card } from '@/components/ui/Card';
-
-interface FunnelData {
-  new: number;
-  contacted: number;
-  qualified: number;
-  converted: number;
-  discarded: number;
-}
 
 function StatCard({
   label,
@@ -41,48 +32,13 @@ function StatCard({
 
 export default function DashboardPage() {
   const { data: user } = useMe();
-
-  const { data: funnel, isLoading: funnelLoading } = useQuery<FunnelData>({
-    queryKey: ['reports', 'funnel'],
-    queryFn: async () => {
-      const res = await api.get('/api/v1/reports/funnel');
-      return res.data;
-    },
-  });
-
-  const { data: contacts, isLoading: contactsLoading } = useQuery<unknown[]>({
-    queryKey: ['contacts', 'count'],
-    queryFn: async () => {
-      const res = await api.get('/api/v1/contacts?limit=1');
-      return res.data;
-    },
-  });
-
-  const totalLeads =
-    funnel &&
-    Object.values(funnel).reduce((sum: number, v) => sum + (v as number), 0);
+  const { data: funnel, isLoading: funnelLoading } = useFunnel(30);
 
   const stats = [
-    {
-      label: 'Total Leads',
-      value: totalLeads,
-      loading: funnelLoading,
-    },
-    {
-      label: 'Leads Calificados',
-      value: funnel?.qualified,
-      loading: funnelLoading,
-    },
-    {
-      label: 'Contactos',
-      value: Array.isArray(contacts) ? contacts.length : undefined,
-      loading: contactsLoading,
-    },
-    {
-      label: 'Deals Activos',
-      value: funnel?.converted,
-      loading: funnelLoading,
-    },
+    { label: 'Total Leads', value: funnel?.leads_total },
+    { label: 'Leads Calificados', value: funnel?.leads_qualified },
+    { label: 'Contactos', value: funnel?.contacts_total },
+    { label: 'Deals Activos', value: funnel?.deals_total },
   ];
 
   return (
@@ -93,7 +49,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
-          <StatCard key={s.label} label={s.label} value={s.value} loading={s.loading} />
+          <StatCard key={s.label} label={s.label} value={s.value} loading={funnelLoading} />
         ))}
       </div>
     </div>
