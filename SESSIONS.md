@@ -893,3 +893,104 @@ Git: `e42dd21` — pushed to origin/main.
 - Reports page: funnel chart, agent performance table, activity by campaign table
 - Settings page: user management (list, invite, deactivate) + pipeline/stage configuration
 - Final polish: 404 page, error boundaries, responsive sidebar (mobile)
+
+---
+
+## Session 10 — Phase 2E: Reports, Settings, Final Polish — Frontend MVP Complete
+
+**Date:** 2026-03-28
+**Phase:** 2E
+**Status:** Complete — 93/93 backend tests passing, TypeScript build clean (12 routes)
+
+---
+
+### What was built
+
+#### Hooks
+| File | Description |
+|---|---|
+| `frontend/hooks/useReports.ts` | useFunnel(days), useAgentPerformance(days), useActivityByCampaign(days). No refetchInterval — reports are on-demand. queryKey includes days param for cache separation. |
+
+#### Pages
+| File | Description |
+|---|---|
+| `frontend/app/dashboard/reports/page.tsx` | Admin/supervisor only (redirect others). Days selector: 7/30/90/365 (default 30, local state). Section 1: funnel flow with arrows + conversion rate pills. Section 2: agent performance table sorted by conversion_rate DESC. Section 3: activity by campaign table. Loading skeletons per section. |
+| `frontend/app/dashboard/settings/page.tsx` | Admin only (redirect others). Two tabs: Usuarios + Pipeline. Users tab: table with invite/deactivate actions, self-deactivate guard (disabled button). Pipeline tab: expandable rows showing stages per pipeline, per-pipeline stage creation. |
+| `frontend/app/not-found.tsx` | Custom 404 — "Página no encontrada" + link to /dashboard. |
+| `frontend/app/error.tsx` | Error boundary — "Algo salió mal" + "Reintentar" button calling reset(). |
+
+#### Modals
+| File | Description |
+|---|---|
+| `frontend/components/settings/UserFormModal.tsx` | Create user — full_name*, email*, password* (min 8), role (select, default agent), timezone (default America/Bogota). react-hook-form + zod. |
+| `frontend/components/settings/PipelineFormModal.tsx` | Create pipeline — name*, description, is_default (checkbox). |
+| `frontend/components/settings/StageFormModal.tsx` | Create stage — name*, order*, pipeline_id (pre-filled), color (input type=color), probability (0-100), is_won/is_lost (checkboxes). |
+
+#### Mobile sidebar
+| File | Description |
+|---|---|
+| `frontend/components/layout/Sidebar.tsx` | Mobile responsive: hidden by default on < md breakpoint. Hamburger button in top header bar. Overlay backdrop on mobile when open. Nav links call onClose to dismiss sidebar after navigation. |
+
+#### Dashboard update
+| File | Description |
+|---|---|
+| `frontend/app/dashboard/page.tsx` | Stat cards now use useFunnel hook from useReports.ts — consistent with reports page, single source of truth. |
+
+---
+
+### Architecture decisions
+
+**Reports are on-demand, not polled**
+Unlike notifications (30s poll), reports use no refetchInterval. Users explicitly change the days selector to refresh. This avoids unnecessary load on the DB for analytical queries that run full-table scans.
+
+**Settings page as admin gate**
+The Settings link in the sidebar is already hidden for non-admin roles (Phase 2A). The page itself adds a redundant client-side role check and redirects — defense in depth for direct URL access.
+
+**StageFormModal order field as string with coercion**
+zod's `z.coerce.number()` causes a resolver type conflict with react-hook-form (same pattern as Phase 2D's currency field). Fixed by using `z.string()` with `Number()` coercion in `onSubmit` before calling the API.
+
+---
+
+### Bugs found and resolved
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| `z.coerce.number()` resolver type conflict in StageFormModal | zod's coerce produces a type incompatible with react-hook-form's resolver for the `order` and `probability` fields. Same root cause as Phase 2D's currency bug. | Changed to `z.string()` with `Number()` coercion in `onSubmit`. |
+| EPERM on `.next/static` during build | Windows file lock from a previous Docker process still holding a handle on the file. | Resolved on retry — no code change needed. |
+
+---
+
+### Final state
+```
+93 backend tests passing
+TypeScript build: 12 routes, 0 errors
+5 Docker services running
+
+Frontend routes (complete):
+  /                           → redirect to /dashboard or /login
+  /login                      → authentication
+  /dashboard                  → home with funnel stat cards
+  /dashboard/leads            → leads table with filters
+  /dashboard/leads/[id]       → lead detail + actions
+  /dashboard/leads/queue      → supervisor assignment queue
+  /dashboard/contacts         → contacts table with filters
+  /dashboard/contacts/[id]    → contact detail + deals section
+  /dashboard/deals            → kanban board with drag-and-drop
+  /dashboard/reports          → funnel + agent performance + campaigns
+  /dashboard/settings         → user management + pipeline config
+  404                         → custom not-found page
+```
+
+Git: `f231920` — pushed to origin/main.
+
+---
+
+### What comes next
+
+**Frontend MVP is complete.** All phases 2A–2E delivered.
+
+Remaining items before first client deployment:
+- OneDrive exclusion: add `frontend/.next` and `frontend/node_modules` to OneDrive "Exclude from sync" list (Windows Settings → OneDrive → Backup → Manage folders) to prevent file lock conflicts during builds.
+- End-to-end test with real client data (seed a pipeline, stages, users, leads via /docs)
+- Update arquitectura_vortem_v2_0.docx to mark frontend phases 2A–2E as complete
+- Production hardening: set SECRET_KEY, VOICEHIRE_WEBHOOK_SECRET, secure=True in .env before client handoff
