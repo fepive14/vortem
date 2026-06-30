@@ -14,6 +14,8 @@ from app.models.activity import Activity, ActivityType
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.lead import Lead, LeadStatus
+from app.models.pipeline import Pipeline
+from app.models.stage import Stage
 
 logger = get_logger(__name__)
 
@@ -88,9 +90,25 @@ async def convert_lead(
     # 5. Mark lead as converted.
     lead.status = LeadStatus.converted
 
-    # 6. Optionally create a Deal.
+    # 6. Optionally create a Deal — validate stage/pipeline belong to this org. [H-022]
     deal: Deal | None = None
     if create_deal and stage_id is not None and pipeline_id is not None:
+        for model, fk_id, field in (
+            (Pipeline, pipeline_id, "pipeline_id"),
+            (Stage, stage_id, "stage_id"),
+        ):
+            res = await session.execute(
+                select(model).where(
+                    model.id == fk_id,
+                    model.organization_id == organization_id,
+                )
+            )
+            if res.scalar_one_or_none() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{field}: resource not found in this organization.",
+                )
+
         name = deal_name or f"Deal — {contact.first_name} {contact.last_name}"
         deal = Deal(
             organization_id=organization_id,

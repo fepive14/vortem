@@ -51,9 +51,7 @@ async def assign_lead(
     lead = await lead_service.get_lead(session, org_id, lead_id)
     if lead is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
-    updated = await supervisor_service.assign_lead(session, lead, body.assigned_to)
-    await session.commit()
-    await session.refresh(updated)
+    updated = await supervisor_service.assign_lead(session, lead, body.assigned_to, organization_id=org_id)
     await publish(
         session,
         event_type=EventType.LEAD_ASSIGNED,
@@ -61,4 +59,6 @@ async def assign_lead(
         organization_id=org_id,
         user_id=current_user.id,
     )
+    await session.commit()
+    await session.refresh(updated)
     return LeadRead.model_validate(updated)

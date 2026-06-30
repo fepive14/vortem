@@ -43,7 +43,8 @@ async def list_stages(
     current_user: User = Depends(require_auth),
     session: AsyncSession = Depends(get_session),
 ) -> list[StageRead]:
-    stages = await stage_service.list_stages(session, pipeline_id)
+    org_id = get_current_org_id(current_user)
+    stages = await stage_service.list_stages(session, org_id, pipeline_id)
     return [StageRead.model_validate(s) for s in stages]
 
 

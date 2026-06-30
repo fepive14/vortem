@@ -59,9 +59,9 @@ def configure_logging(environment: str, log_level: str) -> None:
     )
 
     formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=shared_processors,
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-            *shared_processors,
             renderer,
         ],
     )

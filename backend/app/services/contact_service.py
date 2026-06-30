@@ -4,14 +4,36 @@ from __future__ import annotations
 
 import uuid
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.models.contact import Contact
+from app.models.user import User
 from app.schemas.contact import ContactCreate, ContactUpdate
 
 logger = get_logger(__name__)
+
+
+async def _validate_assigned_to(
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    assigned_to: uuid.UUID,
+) -> None:
+    """Raise 400 if assigned_to is not an active user in organization_id. [H-016]"""
+    result = await session.execute(
+        select(User).where(
+            User.id == assigned_to,
+            User.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="assigned_to: user not found in this organization.",
+        )
 
 
 async def create_contact(
@@ -24,6 +46,9 @@ async def create_contact(
     Flushes but does NOT commit — the caller (endpoint) commits and then
     publishes the CONTACT_CREATED event.
     """
+    if data.assigned_to is not None:
+        await _validate_assigned_to(session, organization_id, data.assigned_to)
+
     contact = Contact(
         organization_id=organization_id,
         **data.model_dump(),
@@ -75,11 +100,16 @@ async def update_contact(
     session: AsyncSession,
     contact: Contact,
     data: ContactUpdate,
+    organization_id: uuid.UUID | None = None,
 ) -> Contact:
     """Apply only the fields explicitly set in data.
 
     Flushes but does NOT commit — the caller (endpoint) commits.
+    Pass organization_id to validate assigned_to cross-org. [H-016]
     """
+    if data.assigned_to is not None and organization_id is not None:
+        await _validate_assigned_to(session, organization_id, data.assigned_to)
+
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(contact, field, value)
     await session.flush()

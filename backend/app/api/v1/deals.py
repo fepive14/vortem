@@ -31,7 +31,6 @@ async def create_deal(
 ) -> DealRead:
     org_id = get_current_org_id(current_user)
     deal = await deal_service.create_deal(session, org_id, body)
-    await session.commit()
     await publish(
         session,
         event_type=EventType.DEAL_CREATED,
@@ -39,6 +38,7 @@ async def create_deal(
         organization_id=org_id,
         user_id=current_user.id,
     )
+    await session.commit()
     return DealRead.model_validate(deal)
 
 
@@ -94,10 +94,8 @@ async def update_deal(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deal not found.")
 
     old_stage_id = deal.stage_id
-    updated = await deal_service.update_deal(session, deal, body)
-    await session.commit()
-    await session.refresh(updated)
-
+    updated = await deal_service.update_deal(session, deal, body, organization_id=org_id)
+    # updated.stage_id is available in memory after flush() in update_deal.
     if body.stage_id is not None and updated.stage_id != old_stage_id:
         await publish(
             session,
@@ -110,7 +108,8 @@ async def update_deal(
             organization_id=org_id,
             user_id=current_user.id,
         )
-
+    await session.commit()
+    await session.refresh(updated)
     return DealRead.model_validate(updated)
 
 

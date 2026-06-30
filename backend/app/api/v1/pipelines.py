@@ -31,7 +31,6 @@ async def create_pipeline(
 ) -> PipelineRead:
     org_id = get_current_org_id(current_user)
     pipeline = await pipeline_service.create_pipeline(session, org_id, body)
-    await session.commit()
     await publish(
         session,
         event_type=EventType.PIPELINE_CREATED,
@@ -39,6 +38,7 @@ async def create_pipeline(
         organization_id=org_id,
         user_id=current_user.id,
     )
+    await session.commit()
     return PipelineRead.model_validate(pipeline)
 
 

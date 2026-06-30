@@ -50,9 +50,8 @@ async def voicehire_webhook(
         organization_id=organization_id,
         payload=payload,
     )
-    await session.commit()
-    await session.refresh(lead)
-
+    # lead.status is already updated in memory after flush() in process_voicehire_event.
+    # Evaluate the condition here (pre-commit) instead of after session.refresh().
     if lead.status == LeadStatus.qualified:
         await publish(
             session,
@@ -67,5 +66,6 @@ async def voicehire_webhook(
         payload={"lead_id": str(lead.id), "event": payload.event},
         organization_id=organization_id,
     )
-
+    await session.commit()
+    await session.refresh(lead)
     return LeadRead.model_validate(lead)

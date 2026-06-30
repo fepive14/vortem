@@ -157,13 +157,17 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
 
     async def _override_get_session() -> AsyncGenerator[AsyncSession, None]:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
 
     _app.dependency_overrides[get_session] = _override_get_session
 
     async with LifespanManager(_app):
         async with AsyncClient(
-            transport=ASGITransport(app=_app),
+            transport=ASGITransport(app=_app, raise_app_exceptions=False),
             base_url="http://test",
         ) as ac:
             yield ac

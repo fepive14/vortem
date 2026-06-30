@@ -31,7 +31,6 @@ async def create_contact(
 ) -> ContactRead:
     org_id = get_current_org_id(current_user)
     contact = await contact_service.create_contact(session, org_id, body)
-    await session.commit()
     await publish(
         session,
         event_type=EventType.CONTACT_CREATED,
@@ -39,6 +38,7 @@ async def create_contact(
         organization_id=org_id,
         user_id=current_user.id,
     )
+    await session.commit()
     return ContactRead.model_validate(contact)
 
 
@@ -92,7 +92,7 @@ async def update_contact(
     contact = await contact_service.get_contact(session, org_id, contact_id)
     if contact is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found.")
-    updated = await contact_service.update_contact(session, contact, body)
+    updated = await contact_service.update_contact(session, contact, body, organization_id=org_id)
     await session.commit()
     await session.refresh(updated)
     return ContactRead.model_validate(updated)

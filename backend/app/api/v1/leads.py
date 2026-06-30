@@ -34,7 +34,6 @@ async def create_lead(
 ) -> LeadRead:
     org_id = get_current_org_id(current_user)
     lead = await lead_service.create_lead(session, org_id, body)
-    await session.commit()
     await publish(
         session,
         event_type=EventType.LEAD_CREATED,
@@ -42,6 +41,7 @@ async def create_lead(
         organization_id=org_id,
         user_id=current_user.id,
     )
+    await session.commit()
     return LeadRead.model_validate(lead)
 
 
@@ -95,7 +95,7 @@ async def update_lead(
     lead = await lead_service.get_lead(session, org_id, lead_id)
     if lead is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found.")
-    updated = await lead_service.update_lead(session, lead, body)
+    updated = await lead_service.update_lead(session, lead, body, organization_id=org_id)
     await session.commit()
     await session.refresh(updated)
     return LeadRead.model_validate(updated)
@@ -148,11 +148,7 @@ async def convert_lead(
         value=body.value,
         currency=body.currency,
     )
-    await session.commit()
-    await session.refresh(contact)
-    if deal is not None:
-        await session.refresh(deal)
-
+    # contact.id was generated explicitly in convert_lead — safe to use pre-commit.
     await publish(
         session,
         event_type=EventType.LEAD_CONVERTED,
@@ -160,6 +156,10 @@ async def convert_lead(
         organization_id=org_id,
         user_id=current_user.id,
     )
+    await session.commit()
+    await session.refresh(contact)
+    if deal is not None:
+        await session.refresh(deal)
     return ConvertLeadResponse(
         contact=ContactRead.model_validate(contact),
         deal=DealRead.model_validate(deal) if deal is not None else None,

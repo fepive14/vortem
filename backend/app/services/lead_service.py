@@ -4,14 +4,36 @@ from __future__ import annotations
 
 import uuid
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.models.lead import Lead
+from app.models.user import User
 from app.schemas.lead import LeadCreate, LeadUpdate
 
 logger = get_logger(__name__)
+
+
+async def _validate_assigned_to(
+    session: AsyncSession,
+    organization_id: uuid.UUID,
+    assigned_to: uuid.UUID,
+) -> None:
+    """Raise 400 if assigned_to is not an active user in organization_id. [H-016]"""
+    result = await session.execute(
+        select(User).where(
+            User.id == assigned_to,
+            User.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="assigned_to: user not found in this organization.",
+        )
 
 
 async def create_lead(
@@ -24,6 +46,9 @@ async def create_lead(
     Flushes but does NOT commit — the caller (endpoint) commits and then
     publishes the LEAD_CREATED event.
     """
+    if data.assigned_to is not None:
+        await _validate_assigned_to(session, organization_id, data.assigned_to)
+
     lead = Lead(
         organization_id=organization_id,
         **data.model_dump(),
@@ -75,11 +100,16 @@ async def update_lead(
     session: AsyncSession,
     lead: Lead,
     data: LeadUpdate,
+    organization_id: uuid.UUID | None = None,
 ) -> Lead:
     """Apply only the fields explicitly set in data.
 
     Flushes but does NOT commit — the caller (endpoint) commits.
+    Pass organization_id to validate assigned_to cross-org. [H-016]
     """
+    if data.assigned_to is not None and organization_id is not None:
+        await _validate_assigned_to(session, organization_id, data.assigned_to)
+
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(lead, field, value)
     await session.flush()

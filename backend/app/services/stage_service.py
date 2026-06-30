@@ -52,11 +52,15 @@ async def create_stage(
 
 async def list_stages(
     session: AsyncSession,
+    organization_id: uuid.UUID,
     pipeline_id: uuid.UUID,
 ) -> list[Stage]:
     result = await session.execute(
         select(Stage)
-        .where(Stage.pipeline_id == pipeline_id)
+        .where(
+            Stage.pipeline_id == pipeline_id,
+            Stage.organization_id == organization_id,
+        )
         .order_by(Stage.order.asc())
     )
     return list(result.scalars().all())
