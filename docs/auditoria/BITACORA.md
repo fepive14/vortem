@@ -48,4 +48,15 @@ _Commits del Bloque A se registrarán cuando el usuario ejecute los tests y conf
 | 2026-06-28 | H-007 | ver commit | `api/v1/webhooks.py`: status evaluado en-memoria (post-flush de process_voicehire_event); ambos publish antes de commit; refresh después |
 | 2026-06-30 | H-007 | ver commit | **Harness de test corregido** — `conftest.py`: `_override_get_session` con rollback en excepción + `raise_app_exceptions=False`; `test_outbox.py`: `lead_id` capturado pre-request para evitar MissingGreenlet post-rollback |
 | 2026-06-30 | — | ver commit | **structlog corregido** — `app/core/logging.py`: `ProcessorFormatter` usa `foreign_pre_chain` para que `add_logger_name` acceda a `_record` antes de que `remove_processors_meta` lo elimine |
-| 2026-06-30 | H-007 | **ver abajo** | Suite completa: **107/107 verdes**. H-007 cerrado. |
+| 2026-06-30 | H-007 | 412d3fa | Suite completa: **107/107 verdes**. H-007 cerrado. |
+
+---
+
+## Bloque H-009 — CLI bootstrap org-admin
+
+| Fecha | Hallazgo(s) | Commit | Acción |
+|-------|------------|--------|--------|
+| 2026-06-30 | H-009 | ver commit | `app/cli/__init__.py` + `app/cli/create_admin.py`: CLI script con `create_org_admin()` (lógica) + `_main()` (interactivo con getpass) |
+| 2026-06-30 | H-009 | ver commit | `tests/test_cli_create_admin.py`: 3 tests — happy path, ya existe org-admin, reutiliza org existente |
+| 2026-06-30 | H-009 | ver commit | `DEPLOYMENT.md`: Step 5b reemplaza SQL workaround con CLI; Step 4 añade nota sobre migraciones obligatorias antes del CLI |
+| 2026-06-30 | H-009 | ver commit | Login confirmado en localhost:3000. Suite completa: **110/110 verdes**. H-009 cerrado. |

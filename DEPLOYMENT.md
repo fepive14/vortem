@@ -80,6 +80,8 @@ docker compose exec backend alembic upgrade head
 
 This command is **idempotent** — it is safe to run multiple times. It applies only unapplied migrations and skips ones already applied.
 
+> **Important:** Docker does not apply migrations automatically on startup. This step must be completed before running `create_admin` (Step 5b) or any other CLI tool that accesses the database. On a brand-new environment, skipping this step causes `relation 'users' does not exist` errors.
+
 ---
 
 ## Step 5 — Bootstrap the instance
@@ -105,46 +107,35 @@ Change the admin password immediately after first login.
 
 ## Step 5b — Create organization admin user
 
-The bootstrap creates a global admin (`is_global_admin=true`) with no `organization_id`. This user cannot operate business endpoints (pipelines, users, leads, etc.). You must create a regular admin user scoped to the organization before using the system.
+> **Requires Step 4 (migrations) to be completed first.** Docker does not run migrations
+> automatically on startup — skipping Step 4 on a fresh environment causes
+> `relation 'users' does not exist`.
 
-First, get the organization ID created in Step 5:
+Run the interactive CLI bootstrap tool:
+
 ```bash
-docker compose exec db psql -U vortem -d vortem -c "SELECT id, name FROM organizations;"
+docker compose exec -it backend python -m app.cli.create_admin
 ```
 
-Then open an interactive psql session to avoid shell interpolation of `$` characters in the bcrypt hash:
-```bash
-docker compose exec db psql -U vortem -d vortem
+The tool prompts for four values (password input is hidden):
+
+```
+=== Vortem CRM — Create Org Admin ===
+
+Email: admin@yourcompany.com
+Full name: Administrator
+Organization name: Your Organization
+Password (min 8 chars):
 ```
 
-Inside psql, generate and insert the user (replace `<org_id>` with the UUID from above):
-```sql
-INSERT INTO users (id, email, full_name, hashed_password, role, is_active, is_global_admin, organization_id, timezone, created_at, updated_at)
-VALUES (
-  gen_random_uuid(),
-  'admin@yourcompany.com',
-  'Administrator',
-  '$2b$12$replacethiswitharealhashgeneratedbythebackend',
-  'admin',
-  true,
-  false,
-  '<org_id>',
-  'America/Bogota',
-  now(),
-  now()
-);
-```
+It hashes the password internally — no SQL, no raw bcrypt hashes. If an organization was
+already created by Step 5, the tool reuses it automatically; no duplicates are created.
 
-To generate a valid bcrypt hash for your chosen password:
-```bash
-docker compose exec backend python -c "from app.core.security import hash_password; print(repr(hash_password('your-password-here')))"
-```
+If you skipped Step 5, the tool creates the organization and admin user in a single step —
+making Step 5 optional for new installations.
 
-Copy the output (including the `$2b$12$...` prefix) and paste it into the psql INSERT above.
-
-> **Important:** Always run the INSERT from inside an interactive psql session (`docker compose exec db psql ...`), never by passing it as a `-c` argument from PowerShell or bash. Shell environments interpolate `$` characters and will corrupt the bcrypt hash silently.
-
-Exit psql with `\q`. You can now log in to the frontend with this user.
+> **Protection:** The tool refuses to run if an org-scoped admin already exists, preventing
+> accidental duplicate accounts.
 
 ---
 

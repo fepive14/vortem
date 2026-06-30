@@ -333,17 +333,28 @@ Añadir `.github/workflows/ci.yml` con job `pytest -v` ejecutado en un contenedo
 |-------|-------|
 | **Severidad** | 🟡 Medio |
 | **Ubicación** | `backend/app/api/v1/setup.py` + `DEPLOYMENT.md` (Step 5b) |
-| **Estado** | Abierto |
+| **Estado** | ✅ Resuelto — 2026-06-30 (D-010) |
 
 **Descripción**
 
-El endpoint `POST /api/v1/setup` crea un `User(is_global_admin=True, organization_id=None)`. Este usuario no puede operar ningún endpoint de negocio (leads, contacts, deals) porque todos requieren `organization_id`. El `DEPLOYMENT.md` documenta como workaround ejecutar un `INSERT SQL` manual con un hash bcrypt hardcodeado y luego otro `UPDATE` en `organizations`.
+El endpoint `POST /api/v1/setup` crea un `User(is_global_admin=True, organization_id=None)`. Este usuario no puede operar ningún endpoint de negocio (leads, contacts, deals) porque todos requieren `organization_id`. El `DEPLOYMENT.md` documentaba como workaround ejecutar un `INSERT SQL` manual con un hash bcrypt hardcodeado.
 
-Esto es frágil: el hash bcrypt puede quedar desactualizado, y un operador sin conocimientos de SQL puede dejar el sistema inutilizable.
+Esto era frágil: el hash bcrypt podía quedar desactualizado, y un operador sin conocimientos de SQL podía dejar el sistema inutilizable.
 
-**Fix propuesto**
+**Fix implementado (2026-06-30)**
 
-Añadir un endpoint `POST /api/v1/setup/org-admin` (solo ejecutable si existe un admin global y no hay admins con org) que cree una organización y un usuario administrador de esa org, o que el propio endpoint `/setup` acepte un parámetro opcional para crear directamente un org-admin.
+CLI script `backend/app/cli/create_admin.py` invocable como:
+```
+docker compose exec -it backend python -m app.cli.create_admin
+```
+
+- Solicita email, nombre, org name y contraseña de forma interactiva (contraseña oculta con `getpass`).
+- Hashea la contraseña vía `hash_password()` de la app — nunca expone el hash al operador.
+- Reutiliza la org existente si ya fue creada por `POST /api/v1/setup`, o crea una nueva.
+- Protección: si ya existe algún usuario con `organization_id IS NOT NULL`, rechaza la ejecución.
+- Capa de lógica (`create_org_admin`) separada del CLI entry point — testeable sin subprocess.
+
+**Tests:** `tests/test_cli_create_admin.py` — 3 tests, 110/110 suite verde.
 
 ---
 

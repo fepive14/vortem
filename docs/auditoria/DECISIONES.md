@@ -109,6 +109,30 @@ VoiceHire agrupa llamadas en campañas. El CRM necesita registrar a qué campañ
 
 ---
 
+## D-010: CLI vs endpoint para bootstrap del primer org-admin (H-009)
+
+**Contexto**
+El endpoint `POST /api/v1/setup` crea un admin global sin `organization_id`. Para operar cualquier endpoint de negocio se necesita un usuario con org. Había dos opciones para crearlo de forma segura.
+
+**Opciones evaluadas**
+
+| | CLI `python -m app.cli.create_admin` | Endpoint `POST /api/v1/setup/org-admin` |
+|---|---|---|
+| Seguridad | Solo quien tiene shell al contenedor puede ejecutarlo | Otro endpoint sin auth expuesto |
+| Password | `getpass.getpass()` — nunca en HTTP ni en logs | En el body JSON |
+| Complejidad | ~80 líneas, sin router ni schema Pydantic | Requiere router + schema + protección HTTP |
+| Precedente | Django `createsuperuser`, Flask `flask create-user` | Menos estándar para este patrón |
+
+**Decisión**: CLI script.
+
+**Implementación**: `backend/app/cli/create_admin.py` con `create_org_admin(session, ...)` como capa de lógica separada (testeable) y `_main()` como entry point interactivo.
+
+**Protección contra doble ejecución**: si ya existe algún usuario con `organization_id IS NOT NULL`, la función rechaza con `ValueError`.
+
+**Estado**: ✅ Aprobada — 2026-06-30. Tests: 110/110 verde.
+
+---
+
 # Decisiones Fase 2b — Nuevas capacidades (pendientes de respuesta)
 
 ---
