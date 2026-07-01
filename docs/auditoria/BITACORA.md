@@ -60,3 +60,20 @@ _Commits del Bloque A se registrarán cuando el usuario ejecute los tests y conf
 | 2026-06-30 | H-009 | ver commit | `tests/test_cli_create_admin.py`: 3 tests — happy path, ya existe org-admin, reutiliza org existente |
 | 2026-06-30 | H-009 | ver commit | `DEPLOYMENT.md`: Step 5b reemplaza SQL workaround con CLI; Step 4 añade nota sobre migraciones obligatorias antes del CLI |
 | 2026-06-30 | H-009 | ver commit | Login confirmado en localhost:3000. Suite completa: **110/110 verdes**. H-009 cerrado. |
+
+---
+
+## Épica V — Verticales de negocio / Fase 1 (H-029)
+
+| Fecha | Hallazgo(s) | Commit | Acción |
+|-------|------------|--------|--------|
+| 2026-07-01 | — | — | Diseño aprobado: arquitectura (D-011), relación 1:N Dueño↔Mascota (D-012), columna tipada vs JSONB (D-013). Plan de 4 fases registrado en ESTADO.md y DECISIONES.md |
+| 2026-07-01 | H-029 | pendiente | `alembic/versions/0005_verticals.py`: enum `org_vertical` + `organizations.vertical NOT NULL DEFAULT 'generic'` |
+| 2026-07-01 | H-029 | pendiente | `models/organization.py`: enum `OrgVertical {generic, veterinary}` + campo `vertical` con `create_type=False` |
+| 2026-07-01 | H-029 | pendiente | `schemas/organization.py`: `vertical: OrgVertical` en `OrganizationResponse` + nuevo `SetOrgVerticalRequest` |
+| 2026-07-01 | H-029 | pendiente | `services/setup_service.py`: `SetupRequest` acepta `vertical` (default `generic`); `bootstrap()` lo propaga al crear la org |
+| 2026-07-01 | H-029 | pendiente | `cli/create_admin.py`: `create_org_admin()` acepta `vertical`; `_main()` lo solicita interactivamente con validación |
+| 2026-07-01 | H-029 | pendiente | `api/v1/organizations.py` (nuevo): `PATCH /{org_id}/vertical` — guard `is_global_admin`; 403 a usuarios normales |
+| 2026-07-01 | H-029 | pendiente | `api/v1/router.py`: registra el nuevo router en `/api/v1/organizations` |
+| 2026-07-01 | H-029 | pendiente | `tests/conftest.py`: crea/destruye tipo `org_vertical` en el esquema de test |
+| 2026-07-01 | H-029 | pendiente | `tests/test_verticals.py`: 8 tests — default generic, CLI con veterinary, setup con/sin vertical, guard 403, global_admin puede cambiar, enum inválido 422, org inexistente 404 |

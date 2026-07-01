@@ -260,3 +260,69 @@ await session.commit()          # un único commit: negocio + evento
 - `api/v1/supervisor.py` — `assign_lead`: publish antes de commit.
 - `api/v1/webhooks.py` — status evaluado en memoria post-flush; ambos publish antes de commit; refresh después.
 - `tests/test_outbox.py` — 3 tests: atomicidad en create_lead, atomicidad en webhook, ambos eventos persistidos.
+
+---
+
+# Decisiones Épica V — Verticales de negocio (2026-07-01)
+
+---
+
+## D-011: Arquitectura de verticales — capa de presentación vs. reescritura de modelos
+
+**Contexto**
+Se quiere que el CRM adapte terminología y pantallas según el tipo de negocio (vertical). Primera vertical: Veterinaria (Dueños/Mascotas/Citas en lugar de Contactos/Leads/Deals).
+
+**Opciones evaluadas**
+
+| | Opción A — campo `vertical` + capa de presentación | Opción B — tablas propias por vertical |
+|---|---|---|
+| Cambio de esquema | ADD COLUMN en `organizations` | Tablas nuevas: `owners`, `pets`, `appointments` |
+| Backend API | Sin cambios (`/api/v1/leads` sigue siendo el endpoint) | Nuevos routers por vertical |
+| Efecto sobre 110 tests | Ninguno (DEFAULT `'generic'`) | Todos se volverían irrelevantes |
+| Semántica de código | Backend habla de "leads"; UI habla de "pacientes" | Perfecta alineación semántica |
+| Tiempo estimado | Días (aditivo) | Semanas (reescritura) |
+| Riesgo | Bajo | Muy alto |
+
+**Decisión**: Opción A — campo `vertical` en `organizations` + capa de presentación en el frontend.
+
+**Justificación**: los fundamentos (aislamiento multi-org, outbox, tests) no se tocan. La terminología es un problema de presentación, no de datos. Los datos de un dueño de mascotas son idénticos a los de un contacto comercial (nombre, teléfono, email). Los datos de una mascota son los de un lead más campos adicionales que se añaden de forma aditiva (tabla `pet_profiles`). El único punto que requiere cambio de esquema es la relación 1:N Dueño↔Mascota, que se resuelve con una columna `leads.owner_id`.
+
+**Estado**: Pendiente de aprobación — 2026-07-01.
+
+---
+
+## D-012: Relación Dueño↔Mascota — cómo modelar 1:N sobre el esquema actual
+
+**Contexto**
+El esquema actual tiene `contacts.lead_id` (nullable, 1:1): un Contact puede venir de un Lead. En el vertical veterinario se necesita 1:N: un Dueño (Contact) tiene N Mascotas (Leads).
+
+**Opciones evaluadas**
+
+| | Opción A — `leads.owner_id FK→contacts` | Opción B — tabla pivot `owner_pets` | Opción C — `contacts.lead_id` es N:M |
+|---|---|---|---|
+| Descripción | FK en el lado "muchos" (en leads) | Tabla de join explícita | Cambiar a JSONB o array |
+| Breaking change | No (columna nullable con default NULL) | No | Sí (elimina `contacts.lead_id` existente) |
+| Semántica | "esta mascota pertenece a este dueño" | Ídem pero más verbose | Pierde la semántica de "convertido de" |
+| Aislamiento | `owner_id` validado = mismo patrón H-016 | Ídem | — |
+| Coexistencia con CRM genérico | `contacts.lead_id` sigue intacto para conversión | Ídem | No |
+
+**Decisión**: Opción A — añadir `leads.owner_id UUID NULL REFERENCES contacts(id) ON DELETE SET NULL`.
+
+**Razón**: La FK en el lado "muchos" es la forma canónica de modelar 1:N en SQL. No toca nada existente. `contacts.lead_id` sigue funcionando para el flujo de conversión Lead→Contact en orgs genéricas. En vet, `owner_id` habilita `SELECT * FROM leads WHERE owner_id = {contact_id}` para listar las mascotas de un dueño.
+
+**Campos específicos de mascota**: tabla `pet_profiles {lead_id PK FK→leads, species, breed, birthdate, sex, weight_kg, notes}` — 1:1 con `leads`, solo existe en vert=veterinary.
+
+**Estado**: Pendiente de aprobación — 2026-07-01.
+
+---
+
+## D-013: `Organization.settings JSONB` vs. columna tipada para `vertical`
+
+**Contexto**
+Ya existe `organizations.settings JSONB` que podría almacenar el vertical como `{"vertical": "veterinary"}`.
+
+**Decisión**: Columna dedicada `vertical TEXT NOT NULL DEFAULT 'generic'`.
+
+**Razón**: El vertical determina el comportamiento del sistema (guards de endpoints, lógica de negocio). No puede ser un campo freeform en un blob JSONB. El backend necesita `if org.vertical == OrgVertical.veterinary` con validación de tipo. `settings` es para configuración arbitraria del tenant; `vertical` es parte del contrato de datos del sistema.
+
+**Estado**: Pendiente de aprobación — 2026-07-01.

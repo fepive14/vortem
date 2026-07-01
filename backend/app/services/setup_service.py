@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.core.security import hash_password
-from app.models.organization import Organization
+from app.models.organization import Organization, OrgVertical
 from app.models.user import User, UserRole
 
 logger = get_logger(__name__)
@@ -19,6 +19,7 @@ class SetupRequest(BaseModel):
     password: str = Field(..., min_length=8)
     full_name: str = Field(..., min_length=1)
     org_name: str = Field(..., min_length=1)
+    vertical: OrgVertical = OrgVertical.generic
 
 
 async def is_already_initialized(session: AsyncSession) -> bool:
@@ -45,7 +46,7 @@ async def bootstrap(session: AsyncSession, request: SetupRequest) -> User:
     Returns:
         The newly created User (not yet committed to DB).
     """
-    org = Organization(name=request.org_name)
+    org = Organization(name=request.org_name, vertical=request.vertical)
     session.add(org)
     await session.flush()  # Assigns org.id
 

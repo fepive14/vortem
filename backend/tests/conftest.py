@@ -21,7 +21,7 @@ from app.models.contact import Contact  # noqa: F401 — registers table with Ba
 from app.models.deal import Deal  # noqa: F401
 from app.models.lead import Lead  # noqa: F401 — registers table with Base.metadata
 from app.models.notification import Notification  # noqa: F401
-from app.models.organization import Organization
+from app.models.organization import Organization  # noqa: F401 — registers OrgVertical enum
 from app.models.pipeline import Pipeline  # noqa: F401
 from app.models.stage import Stage  # noqa: F401
 from app.models.user import User, UserRole
@@ -105,6 +105,14 @@ async def create_tables() -> AsyncGenerator[None, None]:
                 END IF;
             END $$;
         """))
+        await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'org_vertical') THEN
+                    CREATE TYPE org_vertical AS ENUM ('generic', 'veterinary');
+                END IF;
+            END $$;
+        """))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with _TEST_ENGINE.begin() as conn:
@@ -121,6 +129,7 @@ async def create_tables() -> AsyncGenerator[None, None]:
         await conn.execute(text("DROP TYPE IF EXISTS lead_source"))
         await conn.execute(text("DROP TYPE IF EXISTS activity_type"))
         await conn.execute(text("DROP TYPE IF EXISTS notification_priority"))
+        await conn.execute(text("DROP TYPE IF EXISTS org_vertical"))
 
 
 @pytest_asyncio.fixture(autouse=True)

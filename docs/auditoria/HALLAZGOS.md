@@ -936,3 +936,31 @@ def validate_currency(cls, v: str) -> str:
         raise ValueError("currency debe ser un código ISO 4217 de 3 letras (ej: USD, EUR, COP).")
     return v
 ```
+
+---
+
+# HALLAZGOS ÉPICA V — Verticales de negocio (2026-07-01)
+
+---
+
+## H-029 — 🟡 Medio: Concepto de "vertical" ausente en el modelo de Organization
+
+| Campo | Valor |
+|-------|-------|
+| **Severidad** | 🟡 Medio |
+| **Ubicación** | `backend/app/models/organization.py`, `backend/alembic/versions/` |
+| **Estado** | ✅ Resuelto — 2026-07-01 |
+
+**Descripción**
+
+El modelo `Organization` no tenía ningún concepto de tipo de negocio ("vertical"). Sin este campo, el CRM no puede adaptar terminología ni pantallas según el sector del cliente (veterinaria, inmobiliaria, etc.). La agencia no tenía forma de marcar una org como perteneciente a una vertical específica, ni de proteger ese campo de modificaciones por parte del propio cliente.
+
+**Fix implementado**
+
+- Migración `0005_verticals.py`: enum PostgreSQL `org_vertical ('generic', 'veterinary')` + columna `organizations.vertical NOT NULL DEFAULT 'generic'`
+- Enum `OrgVertical` en `models/organization.py` con `create_type=False` (tipo creado por la migración)
+- Campo `vertical` en `OrganizationResponse` schema
+- `SetupRequest` acepta `vertical` opcional (default `generic`)
+- `create_org_admin()` CLI acepta `vertical` opcional (default `generic`)
+- Nuevo endpoint `PATCH /api/v1/organizations/{org_id}/vertical` — solo `is_global_admin=True`; usuarios normales reciben 403
+- 8 tests en `tests/test_verticals.py`; suite completa: **118/118 verdes**

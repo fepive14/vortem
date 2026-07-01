@@ -7,6 +7,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.organization import OrgVertical
+
 
 class OrganizationResponse(BaseModel):
     """Public representation of an organization."""
@@ -20,5 +22,10 @@ class OrganizationResponse(BaseModel):
     is_active: bool
     settings: dict
     parent_id: uuid.UUID | None
+    vertical: OrgVertical
     created_at: datetime
     updated_at: datetime
+
+
+class SetOrgVerticalRequest(BaseModel):
+    vertical: OrgVertical

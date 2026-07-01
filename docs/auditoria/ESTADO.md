@@ -1,6 +1,6 @@
 # ESTADO — Auditoría Vortem CRM
 
-> Actualizado: 2026-06-28 | Fase actual: **1b completada / Fase 2b completada — Esperando aprobación**
+> Actualizado: 2026-07-01 | Fase actual: **Épica V — H-029 (V-1 Cimiento) cerrado, 118/118 verdes**
 
 ---
 
@@ -11,6 +11,8 @@ El objetivo cambió de "integración VoiceHire" a **"CRM funcional para uso real
 2. Crear registros manualmente desde la aplicación
 3. Que cada organización defina sus propios estados/categorías para clientes
 4. Que esos estados/categorías disparen acciones automáticas (triggers)
+
+**Nuevo frente (2026-07-01): Verticales de negocio** — La agencia asigna una vertical a cada org (ej. `veterinary`). El CRM adapta terminología y pantallas según la vertical. Primera vertical a construir: **Veterinaria** (Dueños/Mascotas/Citas). Ver épica H-029 a H-032 y decisiones D-011.
 
 La app corre **solo en local** — no expuesta a internet, sin usuarios reales aún.
 
@@ -25,7 +27,8 @@ La app corre **solo en local** — no expuesta a internet, sin usuarios reales a
 | 1b | Auditoría (nueva superficie) | ✅ Completo |
 | 2 | Documentación y plan (VoiceHire) | ✅ Completo |
 | 2b | Plan — 4 capacidades nuevas | ✅ Completo |
-| 3/4 | Bloque A: aislamiento multi-org | 🔄 En progreso — tests escritos, fixes aplicados, **pendiente de ejecución** |
+| 3/4 | Bloque A: aislamiento multi-org | ✅ Completo — H-015/016/017/022 cerrados, 110/110 verde |
+| 3/4 | Bloque D: outbox (H-007) + CLI admin (H-009) | ✅ Completo — implementados y testeados |
 | 3/4 | Bloque B: CSV import | ⏸ Pendiente |
 | 3/4 | Bloque C: estados custom | ⏸ Pendiente |
 | 3/4 | Bloque D: triggers (H-021, H-004, H-011) | ⏸ Pendiente — D-009 resuelto, H-007 cerrado |
@@ -103,13 +106,13 @@ La app corre **solo en local** — no expuesta a internet, sin usuarios reales a
 
 ### Bloque A — Aislamiento multi-org (prerequisito de todo lo demás)
 
-- [ ] **[H-015]** Fix `list_stages`: añadir `organization_id` al filtro del servicio y pasar `org_id` desde el endpoint
-- [ ] **[H-015]** Test IDOR: usuario de org A no puede leer stages de org B
-- [ ] **[H-016]** Validar `assigned_to` contra la org en leads, contacts, deals y `assign_lead`
-- [ ] **[H-016]** Tests de asignación cross-org (debe devolver 400)
-- [ ] **[H-017]** Validar `contact_id`, `stage_id`, `pipeline_id` en `deal_service.create_deal`
-- [ ] **[H-022]** Idem en `conversion_service.convert_lead`
-- [ ] **[H-017/H-022]** Tests de FK cross-org en deals y conversión
+- [x] **[H-015]** Fix `list_stages`: añadir `organization_id` al filtro del servicio y pasar `org_id` desde el endpoint ✅
+- [x] **[H-015]** Test IDOR: usuario de org A no puede leer stages de org B ✅
+- [x] **[H-016]** Validar `assigned_to` contra la org en leads, contacts, deals y `assign_lead` ✅
+- [x] **[H-016]** Tests de asignación cross-org (debe devolver 400) ✅
+- [x] **[H-017]** Validar `contact_id`, `stage_id`, `pipeline_id` en `deal_service.create_deal` ✅
+- [x] **[H-022]** Idem en `conversion_service.convert_lead` ✅
+- [x] **[H-017/H-022]** Tests de FK cross-org en deals y conversión ✅
 
 ### Bloque B — CSV import (depende de A para el aislamiento)
 
@@ -145,3 +148,46 @@ La app corre **solo en local** — no expuesta a internet, sin usuarios reales a
 - [ ] **[H-008]** GitHub Actions CI
 - [ ] **[H-012]** Sanitizar `X-Request-ID`
 - [ ] **[H-028]** Validación ISO 4217 en `currency`
+
+---
+
+## Épica V — Verticales de negocio (nueva — 2026-07-01)
+
+> Diseño aprobado pendiente de revisión. Primera vertical: **Veterinaria**.
+> Ver decisiones D-011 en DECISIONES.md.
+
+| ID | Fase | Alcance | Estado |
+|----|------|---------|--------|
+| **H-029** | V-1: Cimiento | Campo `vertical` en `organizations` (migración + modelo + schema + guard) | ✅ Cerrado — 2026-07-01 |
+| **H-030** | V-2: Renombrado UI | Módulo `verticalConfig.ts` + Context en dashboard + todos los labels dinámicos | ⏸ Pendiente (H-029 ✅) |
+| **H-031** | V-3: Campos mascota | Migración `leads.owner_id` + tabla `pet_profiles` + endpoints + validación org | ⏸ Bloquea en H-030 |
+| **H-032** | V-4: Pantallas propias | Agenda de citas, historial médico, recordatorios vacunas | ⏸ Bloquea en H-031 + H-021 |
+
+### Bloque V-1 — Campo `vertical` en el sistema ✅
+
+- [x] **[H-029]** Migración `0005_verticals.py`: enum `org_vertical` + `organizations.vertical NOT NULL DEFAULT 'generic'` ✅
+- [x] **[H-029]** Enum `OrgVertical {generic, veterinary}` en `models/organization.py` + modelo actualizado ✅
+- [x] **[H-029]** `OrganizationResponse` incluye `vertical`; `PATCH /organizations/{id}/vertical` solo para `global_admin` (403 a usuarios normales) ✅
+- [x] **[H-029]** 8 tests: default generic, CLI con veterinary, setup con/sin vertical, guard 403, global_admin puede cambiar, enum inválido 422, org inexistente 404 ✅
+
+### Bloque V-2 — Terminología dinámica (frontend)
+
+- [ ] **[H-030]** `frontend/lib/verticalConfig.ts`: mapa `VerticalKey → VerticalTerms`
+- [ ] **[H-030]** Hook/Context en `DashboardLayout` para exponer `vertical` a toda la UI
+- [ ] **[H-030]** Sidebar, títulos, botones, mensajes vacíos: todos leen del context
+- [ ] **[H-030]** Grep exhaustivo de strings comerciales hardcodeados antes de cerrar
+
+### Bloque V-3 — Campos de mascota y relación Dueño↔Mascota
+
+- [ ] **[H-031]** Migración `0006_vet_pet_fields.py`: `leads.owner_id UUID NULL FK→contacts`
+- [ ] **[H-031]** Migración: tabla `pet_profiles {lead_id PK FK, species, breed, birthdate, sex, weight_kg, notes}`
+- [ ] **[H-031]** Validar `owner_id` pertenece a la misma org (mismo patrón que H-016)
+- [ ] **[H-031]** Endpoints: `GET/PUT /api/v1/leads/{id}/pet-profile` (guard: solo vert=veterinary)
+- [ ] **[H-031]** Frontend: formulario de mascota condicional; vista de Dueño con lista de mascotas
+- [ ] **[H-031]** 4-6 tests: CRUD pet_profile, owner_id cross-org rechazado, guard de vertical
+
+### Bloque V-4 — Pantallas propias veterinaria
+
+- [ ] **[H-032]** Agenda de citas: vista de calendario sobre Deals (vet context)
+- [ ] **[H-032]** Historial médico por mascota: Activities + pet_profile en vista de Lead
+- [ ] **[H-032]** Recordatorios de vacunas/controles (requiere H-021 — motor de triggers)

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
-from app.models.organization import Organization
+from app.models.organization import Organization, OrgVertical
 from app.models.user import User, UserRole
 
 
@@ -28,6 +28,7 @@ async def create_org_admin(
     full_name: str,
     org_name: str,
     password: str,
+    vertical: OrgVertical = OrgVertical.generic,
 ) -> User:
     """Create the first organization-scoped admin user.
 
@@ -72,7 +73,7 @@ async def create_org_admin(
     ).scalar_one_or_none()
 
     if org is None:
-        org = Organization(name=org_name)
+        org = Organization(name=org_name, vertical=vertical)
         session.add(org)
         await session.flush()
 
@@ -95,7 +96,14 @@ async def _main() -> None:
     email = input("Email: ").strip()
     full_name = input("Full name: ").strip()
     org_name = input("Organization name: ").strip()
+    vertical_input = input("Vertical [generic/veterinary, default: generic]: ").strip() or "generic"
     password = getpass.getpass("Password (min 8 chars): ")
+
+    try:
+        vertical = OrgVertical(vertical_input)
+    except ValueError:
+        print(f"\nError: Unknown vertical '{vertical_input}'. Valid values: generic, veterinary.", file=sys.stderr)
+        sys.exit(1)
 
     async with AsyncSessionLocal() as session:
         try:
@@ -105,12 +113,14 @@ async def _main() -> None:
                 full_name=full_name,
                 org_name=org_name,
                 password=password,
+                vertical=vertical,
             )
             await session.commit()
             print("\nAdmin created successfully.")
-            print(f"  Email : {user.email}")
-            print(f"  Name  : {user.full_name}")
-            print(f"  Org ID: {user.organization_id}")
+            print(f"  Email   : {user.email}")
+            print(f"  Name    : {user.full_name}")
+            print(f"  Org ID  : {user.organization_id}")
+            print(f"  Vertical: {vertical.value}")
             print("\nYou can now log in at http://localhost:3000")
         except ValueError as exc:
             print(f"\nError: {exc}", file=sys.stderr)

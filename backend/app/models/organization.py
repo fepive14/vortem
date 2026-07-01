@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import enum
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Text
+from sqlalchemy import Boolean, Enum as SAEnum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+
+class OrgVertical(str, enum.Enum):
+    generic = "generic"
+    veterinary = "veterinary"
 
 
 class Organization(Base):
@@ -18,6 +24,13 @@ class Organization(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    vertical: Mapped[OrgVertical] = mapped_column(
+        SAEnum(OrgVertical, name="org_vertical", create_type=False),
+        nullable=False,
+        default=OrgVertical.generic,
+        server_default="generic",
+    )
 
     # FK to Pipeline — constraint is added by migration 0003 (ALTER TABLE).
     # Kept as plain UUID here to avoid a circular FK dependency between
