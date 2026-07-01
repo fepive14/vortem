@@ -77,3 +77,4 @@ _Commits del Bloque A se registrarán cuando el usuario ejecute los tests y conf
 | 2026-07-01 | H-029 | pendiente | `api/v1/router.py`: registra el nuevo router en `/api/v1/organizations` |
 | 2026-07-01 | H-029 | pendiente | `tests/conftest.py`: crea/destruye tipo `org_vertical` en el esquema de test |
 | 2026-07-01 | H-029 | pendiente | `tests/test_verticals.py`: 8 tests — default generic, CLI con veterinary, setup con/sin vertical, guard 403, global_admin puede cambiar, enum inválido 422, org inexistente 404 |
+| 2026-07-01 | H-029 | d01fbfa | Suite completa: **118/118 verdes**. H-029 cerrado. |
